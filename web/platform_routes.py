@@ -72,6 +72,7 @@ class PaperIn(BaseModel):
     duration: int = 120
     total_score: float = 0
     questions: List[dict] = []
+    remark: str = ""
 
 
 @router.post("/papers")
@@ -81,6 +82,7 @@ async def create_paper(body: PaperIn, request: Request):
         "teacher_id": u["id"], "title": body.title, "subject": body.subject,
         "duration": body.duration, "total_score": body.total_score,
         "questions_json": json.dumps(body.questions, ensure_ascii=False),
+        "remark": body.remark,
     })
     return {"id": pid}
 
@@ -98,10 +100,14 @@ async def list_papers(request: Request):
             "id": p["id"], "title": p["title"], "subject": p["subject"],
             "duration": p["duration"], "total_score": p["total_score"],
             "created_at": p["created_at"], "is_practice": bool(p.get("is_practice")),
+            "remark": p.get("remark"),
+            "published": bool(p.get("published")),
+            "published_at": p.get("published_at"),
             "question_count": len(qs),
             "distributed_count": len(dists),
             "submitted_count": len(subs),
             "graded_count": sum(1 for s in subs if s["status"] == "graded"),
+            "distributions": dists,
         })
     return {"papers": out}
 
@@ -125,6 +131,36 @@ async def delete_paper(pid: int, request: Request):
         raise HTTPException(status_code=404, detail="试卷不存在")
     db.delete_paper(pid)
     return {"ok": True}
+
+
+class PaperUpdateIn(BaseModel):
+    title: str = None
+    remark: str = None
+    subject: str = None
+    duration: int = None
+
+
+@router.put("/papers/{pid}")
+async def update_paper_meta(pid: int, body: PaperUpdateIn, request: Request):
+    u = auth.require_role(request, "teacher")
+    p = db.get_paper(pid)
+    if not p or p["teacher_id"] != u["id"]:
+        raise HTTPException(status_code=404, detail="试卷不存在")
+    db.update_paper_meta(pid, title=body.title, remark=body.remark,
+                         subject=body.subject, duration=body.duration)
+    return {"ok": True}
+
+
+@router.post("/papers/{pid}/publish")
+async def publish_paper(pid: int, request: Request):
+    u = auth.require_role(request, "teacher")
+    p = db.get_paper(pid)
+    if not p or p["teacher_id"] != u["id"]:
+        raise HTTPException(status_code=404, detail="试卷不存在")
+    if p.get("is_practice"):
+        raise HTTPException(status_code=400, detail="练习卷无需发布成绩")
+    db.publish_paper(pid)
+    return {"ok": True, "published": True}
 
 
 # ═══════════════════════════════════════════════════════════
