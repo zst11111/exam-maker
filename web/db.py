@@ -101,6 +101,14 @@ def init_db() -> None:
     pcols = [r["name"] for r in conn.execute("PRAGMA table_info(papers)").fetchall()]
     if "is_practice" not in pcols:
         conn.execute("ALTER TABLE papers ADD COLUMN is_practice INTEGER DEFAULT 0")
+    # 迁移：旧库补 remark / published / published_at（教师备注 + 成绩发布状态，幂等）
+    pcols2 = [r["name"] for r in conn.execute("PRAGMA table_info(papers)").fetchall()]
+    if "remark" not in pcols2:
+        conn.execute("ALTER TABLE papers ADD COLUMN remark TEXT")
+    if "published" not in pcols2:
+        conn.execute("ALTER TABLE papers ADD COLUMN published INTEGER DEFAULT 0")
+    if "published_at" not in pcols2:
+        conn.execute("ALTER TABLE papers ADD COLUMN published_at TEXT")
     # 辅导员：旷课 / 请假 / 学业警告
     conn.execute("""
         CREATE TABLE IF NOT EXISTS attendance_records (
@@ -282,12 +290,13 @@ def count_students() -> int:
 def create_paper(p: Dict[str, Any]) -> int:
     conn = get_conn()
     cur = conn.execute("""
-        INSERT INTO papers (teacher_id, title, subject, duration, total_score, questions_json, is_practice, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO papers (teacher_id, title, subject, duration, total_score, questions_json, is_practice, remark, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         p["teacher_id"], p.get("title", ""), p.get("subject", ""),
         p.get("duration", 120), p.get("total_score", 0),
-        p.get("questions_json", "[]"), 1 if p.get("is_practice") else 0, _now(),
+        p.get("questions_json", "[]"), 1 if p.get("is_practice") else 0,
+        p.get("remark"), _now(),
     ))
     conn.commit()
     pid = cur.lastrowid
@@ -316,6 +325,31 @@ def delete_paper(pid: int) -> None:
     conn.execute("DELETE FROM papers WHERE id = ?", (pid,))
     conn.execute("DELETE FROM distributions WHERE paper_id = ?", (pid,))
     conn.execute("DELETE FROM submissions WHERE paper_id = ?", (pid,))
+    conn.commit()
+    conn.close()
+
+
+def update_paper_meta(pid: int, title: str = None, remark: str = None,
+                      subject: str = None, duration: int = None) -> None:
+    """只更新传入的非 None 字段（教师改名 / 备注 / 学科 / 时长）。"""
+    sets, params = [], []
+    for key, val in (("title", title), ("remark", remark), ("subject", subject), ("duration", duration)):
+        if val is not None:
+            sets.append(f"{key} = ?")
+            params.append(val)
+    if not sets:
+        return
+    conn = get_conn()
+    params.append(pid)
+    conn.execute(f"UPDATE papers SET {', '.join(sets)} WHERE id = ?", params)
+    conn.commit()
+    conn.close()
+
+
+def publish_paper(pid: int) -> None:
+    """发布整卷成绩：published=1, published_at=now（学生端才可见分数）。"""
+    conn = get_conn()
+    conn.execute("UPDATE papers SET published = 1, published_at = ? WHERE id = ?", (_now(), pid))
     conn.commit()
     conn.close()
 
