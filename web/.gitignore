@@ -1,0 +1,8 @@
+# 运行时数据（不入库，启动时自动重建）
+__pycache__/
+*.pyc
+data/
+sessions/
+uploads/
+outputs/
+*.log

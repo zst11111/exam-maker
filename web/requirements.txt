@@ -1,0 +1,17 @@
+fastapi<0.100
+uvicorn[standard]
+python-multipart
+openai
+aiofiles
+PyPDF2
+python-docx
+# 锁定到已知可用的 exam_env 环境（Python 3.11.15），2026-08-14 按 pip freeze 核对
+# 注意：fastapi 0.99.x 与 pydantic 1.x 是一组兼容组合，切勿单独升级任一
+fastapi==0.99.1
+pydantic==1.10.26
+uvicorn[standard]==0.52.1
+python-multipart==0.0.32
+openai==3.0.0
+aiofiles==25.1.0
+PyPDF2==3.0.1
+python-docx==1.2.0

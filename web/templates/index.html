@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数智命题师 · exam-maker v3（教师端 + 学生端）</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+</head>
+<body>
+<header>
+    <div class="header-inner">
+        <div class="header-brand">
+            <h1>📝 数智命题师</h1>
+            <span class="subtitle">上传往年真题 → AI 解析考点 → 教师确认 → 智能命题 → 下载成卷</span>
+        </div>
+        <div class="user-bar hidden" id="userBar">
+            <span id="userInfo" class="user-info"></span>
+            <button class="btn-small btn-logout" id="btnLogout">退出登录</button>
+        </div>
+    </div>
+</header>
+
+<main>
+    <!-- ══════════════════════════════════════════ -->
+    <!-- 登录视图 -->
+    <!-- ══════════════════════════════════════════ -->
+    <div id="loginView" class="login-view">
+        <div class="login-card">
+            <h2>🔐 登录</h2>
+            <p class="login-hint">请使用教师或学生账号登录</p>
+            <div class="form-group">
+                <label for="loginUsername">用户名</label>
+                <input type="text" id="loginUsername" placeholder="请输入用户名" autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">密码</label>
+                <input type="password" id="loginPassword" placeholder="请输入密码" autocomplete="current-password">
+            </div>
+            <button type="button" class="btn-primary" id="btnLogin">登 录</button>
+            <p class="login-err hidden" id="loginError"></p>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- 教师端 -->
+    <!-- ══════════════════════════════════════════ -->
+    <div id="teacherApp" class="app hidden">
+        <nav class="top-tabs">
+            <button class="top-tab" id="tabHome" onclick="switchTeacherTab('home')">🏠 首页</button>
+            <button class="top-tab" id="tabWizard" onclick="switchTeacherTab('wizard')">📝 出试卷</button>
+            <button class="top-tab" id="tabBank" onclick="switchTeacherTab('bank')">🗂️ 题库管理</button>
+            <button class="top-tab" id="tabAnalytics" onclick="switchTeacherTab('analytics')">📊 学生学情</button>
+        </nav>
+
+        <!-- 首页：统计卡 + 我的试卷 -->
+        <div class="tab-panel" id="teacherHome">
+            <div class="stat-cards" id="statCards"></div>
+            <div class="section-head">
+                <h2>我的试卷</h2>
+            </div>
+            <div id="myPapers" class="paper-list"></div>
+        </div>
+
+        <!-- 出试卷（5步向导，原 DOM 完整保留） -->
+        <div class="tab-panel" id="wizardWrap">
+            <div class="wizard">
+                <div class="steps-bar" id="stepsBar">
+                    <div class="step active" data-step="1">
+                        <div class="step-num">1</div>
+                        <div class="step-label">基本信息</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step" data-step="2">
+                        <div class="step-num">2</div>
+                        <div class="step-label">上传真题</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step" data-step="3">
+                        <div class="step-num">3</div>
+                        <div class="step-label">知识点确认</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step" data-step="4">
+                        <div class="step-num">4</div>
+                        <div class="step-label">命题设置</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step" data-step="5">
+                        <div class="step-num">5</div>
+                        <div class="step-label">预览下载</div>
+                    </div>
+                </div>
+
+                <div class="step-content" id="stepContent">
+
+                    <!-- Step 1: 基本信息 -->
+                    <div class="step-panel active" id="panel-step1">
+                        <h2>📋 第一步：基本信息</h2>
+                        <p class="step-desc">填写课程信息和命题范围，AI 也会从真题中自动推断补充。</p>
+                        <div class="form-group">
+                            <label for="subject">学科 <span class="hint">如：数学 / 物理 / 化学</span></label>
+                            <input type="text" id="subject" placeholder="如：数学">
+                        </div>
+                        <div class="form-group">
+                            <label for="course">课程名称 <span class="hint">留空则从真题自动推断</span></label>
+                            <input type="text" id="course" placeholder="如：线性代数（III）">
+                        </div>
+                        <div class="form-group">
+                            <label for="scope">命题范围 <span class="hint">可选，留空由 AI 从真题归纳</span></label>
+                            <input type="text" id="scope" placeholder="如：第1-5章，重点在特征值与二次型">
+                        </div>
+                    </div>
+
+                    <!-- Step 2: 上传真题 + AI 解析 -->
+                    <div class="step-panel" id="panel-step2">
+                        <h2>📤 第二步：上传往年真题</h2>
+                        <p class="step-desc">上传近 3 年（或更多）真题，支持 PDF / DOCX / TEX / MD 格式。</p>
+
+                        <div class="drop-zone" id="dropZone">
+                            <div class="drop-zone-inner">
+                                <span class="drop-icon">📂</span>
+                                <p>拖拽文件到此处，或点击选择</p>
+                                <p class="hint">支持 PDF / DOCX / TEX / MD，可多份同时上传</p>
+                            </div>
+                            <input type="file" id="pastPapers" multiple accept=".pdf,.docx,.doc,.tex,.md,.txt" hidden>
+                        </div>
+                        <div class="file-list" id="fileList"></div>
+                        <button type="button" class="btn-primary" id="btnUpload" disabled style="margin-top:16px">
+                            📤 上传并开始 AI 解析
+                        </button>
+
+                        <div class="analysis-box hidden" id="analysisBox">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="analysisProgress" style="width:0%"></div>
+                            </div>
+                            <div class="log-box">
+                                <div class="log-entries" id="analysisLog"></div>
+                            </div>
+                            <div class="analysis-result hidden" id="analysisResult">
+                                <h4>✅ 解析完成 — 知识点摘要</h4>
+                                <div id="analysisSummary"></div>
+                            </div>
+                        </div>
+
+                        <div class="syllabus-block">
+                            <div class="syllabus-divider">或：不传真题，按专业 / 年级直接生成知识点大纲</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="sylMajor">专业</label>
+                                    <input type="text" id="sylMajor" placeholder="如：数学 / 物理 / 化学" list="majorList">
+                                    <datalist id="majorList">
+                                        <option>数学</option><option>物理</option><option>化学</option>
+                                        <option>计算机</option><option>英语</option><option>临床医学</option>
+                                    </datalist>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sylGrade">年级</label>
+                                    <select id="sylGrade">
+                                        <option>大一</option><option>大二</option><option>大三</option><option>大四</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>考试阶段</label>
+                                    <div class="phase-radios">
+                                        <label><input type="radio" name="sylPhase" value="期中" checked> 期中</label>
+                                        <label><input type="radio" name="sylPhase" value="期末"> 期末</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-secondary" id="btnGenSyllabus" style="margin-top:12px">
+                                🤖 直接生成知识点大纲
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: 知识点确认 + 教师修正 -->
+                    <div class="step-panel" id="panel-step3">
+                        <h2>🔍 第三步：知识点确认与修正</h2>
+                        <p class="step-desc">AI 已从真题中提取知识点。请检查、修正、增删，确认后进入命题。</p>
+
+                        <div class="kp-toolbar">
+                            <button class="btn-small" id="btnAddRow">＋ 添加知识点</button>
+                            <button class="btn-small" id="btnExportKP">📥 导出 JSON</button>
+                            <span class="kp-hint">💡 双击单元格可编辑，点击 × 删除行</span>
+                        </div>
+
+                        <div class="kp-table-wrapper">
+                            <table class="kp-table" id="kpTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:20%">章节</th>
+                                        <th style="width:25%">知识点</th>
+                                        <th style="width:10%">难度</th>
+                                        <th style="width:10%">频次</th>
+                                        <th style="width:25%">对应真题</th>
+                                        <th style="width:10%">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="kpTableBody">
+                                    <tr><td colspan="6" class="empty-row">请先完成第二步"上传真题+AI解析"</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <button type="button" class="btn-primary" id="btnSaveKnowledge" style="margin-top:16px">
+                            ✅ 确认知识点，进入命题设置
+                        </button>
+                    </div>
+
+                    <!-- Step 4: 命题设置 + 试卷结构预览 -->
+                    <div class="step-panel" id="panel-step4">
+                        <h2>⚙️ 第四步：命题设置</h2>
+                        <p class="step-desc">调整难度配比和套数，AI 将据此生成试卷结构（题号/题型/分值/章节/知识点/难度）。</p>
+
+                        <div class="form-group">
+                            <label>难度配比（按分值）</label>
+                            <div class="difficulty-slider">
+                                <div class="slider-track">
+                                    <div class="slider-fill basic" id="sliderBasic" style="width:60%"></div>
+                                    <div class="slider-fill medium" id="sliderMedium" style="width:30%"></div>
+                                    <div class="slider-fill hard" id="sliderHard" style="width:10%"></div>
+                                </div>
+                                <div class="slider-labels">
+                                    <span class="slider-label basic">🟢 基础 <strong id="basicPct">60%</strong></span>
+                                    <span class="slider-label medium">🟡 中等 <strong id="mediumPct">30%</strong></span>
+                                    <span class="slider-label hard">🔴 难 <strong id="hardPct">10%</strong></span>
+                                </div>
+                                <div class="slider-inputs">
+                                    <input type="range" id="basicSlider" min="10" max="80" value="60" step="5">
+                                    <input type="range" id="hardSlider" min="5" max="50" value="10" step="5">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="nSets">生成套数</label>
+                                <select id="nSets">
+                                    <option value="1">1 套</option>
+                                    <option value="2" selected>2 套</option>
+                                    <option value="4">4 套</option>
+                                    <option value="8">8 套</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn-secondary" id="btnPreviewStructure">
+                            🤖 AI 生成试卷结构
+                        </button>
+
+                        <div class="structure-box hidden" id="structureBox">
+                            <div class="log-box"><div class="log-entries" id="structureLog"></div></div>
+                            <div class="structure-toolbar">
+                                <button class="btn-small" id="btnAddQuestion">＋ 添加题目</button>
+                                <span class="kp-hint">💡 知识点列可从下拉选择；双击单元格可编辑</span>
+                            </div>
+                            <div class="kp-table-wrapper">
+                                <table class="structure-table" id="structureTable">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:8%">题号</th>
+                                            <th style="width:12%">题型</th>
+                                            <th style="width:8%">分值</th>
+                                            <th style="width:14%">章节</th>
+                                            <th style="width:20%">知识点</th>
+                                            <th style="width:10%">难度</th>
+                                            <th style="width:8%">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="structureBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: 命题生成 + 预览下载 -->
+                    <div class="step-panel" id="panel-step5">
+                        <h2>📝 第五步：命题生成与下载</h2>
+                        <p class="step-desc">AI 根据试卷结构命制试题，实时展示生成过程。</p>
+
+                        <button type="button" class="btn-primary" id="btnGenerate">
+                            🚀 开始命题
+                        </button>
+
+                        <div class="step5-layout">
+                            <div class="step5-main">
+                                <div class="paper-toolbar">
+                                    <label for="paperTemplate">试卷模板：</label>
+                                    <select id="paperTemplate">
+                                        <option value="standard" selected>标准卷（密封线）</option>
+                                        <option value="simple">简洁卷</option>
+                                    </select>
+                                    <button class="btn-small" id="btnImportBank">📥 一键入库</button>
+                                    <button class="btn-small" id="btnSavePaper">💾 保存到我的试卷</button>
+                                    <button class="btn-small" id="btnPrint" onclick="window.print()">📄 导出 PDF</button>
+                                </div>
+                                <div class="paper-render hidden" id="paperRender"></div>
+
+                                <div class="generate-box hidden" id="generateBox">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="generateProgress" style="width:0%"></div>
+                                    </div>
+                                    <div class="log-box">
+                                        <div class="log-entries" id="generateLog"></div>
+                                    </div>
+                                </div>
+
+                                <div class="error-box hidden" id="errorBox"></div>
+                            </div>
+
+                            <aside class="replace-side hidden" id="replaceSide">
+                                <div class="replace-side-head">
+                                    <h3>替换题目 <span class="replace-target" id="replaceTarget"></span></h3>
+                                    <button class="btn-del-row" onclick="closeReplace()">×</button>
+                                </div>
+                                <div class="replace-tabs">
+                                    <button class="tab active" data-tab="bank">从题库</button>
+                                    <button class="tab" data-tab="ai">AI 生成备选</button>
+                                </div>
+                                <div class="replace-panel" id="replaceBankPanel">
+                                    <p class="hint" id="replaceMatchHint"></p>
+                                    <div class="replace-list" id="replaceBankList">加载中…</div>
+                                </div>
+                                <div class="replace-panel hidden" id="replaceAiPanel">
+                                    <button class="btn-small" id="replaceBtnGenAlt">🤖 生成 3 个备选</button>
+                                    <div class="replace-list" id="replaceAiList"></div>
+                                </div>
+                            </aside>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wizard-nav">
+                    <button class="btn-nav btn-prev" id="btnPrev" disabled>← 上一步</button>
+                    <span class="nav-hint" id="navHint"></span>
+                    <button class="btn-nav btn-next" id="btnNext">下一步 →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 题库管理 -->
+        <div class="tab-panel hidden" id="bankView">
+            <h2>🗂️ 题库管理</h2>
+            <div class="bank-filter">
+                <input type="text" id="fSubject" placeholder="学科">
+                <input type="text" id="fTopic" placeholder="知识点">
+                <select id="fType"><option value="">全部题型</option><option>选择题</option><option>填空题</option><option>计算题</option><option>证明题</option><option>简答题</option></select>
+                <select id="fDifficulty"><option value="">全部难度</option><option>基础</option><option>中等</option><option>难</option></select>
+                <select id="fSource"><option value="">全部来源</option><option value="teacher">某位老师</option><option value="paper">试卷</option><option value="ai">AI</option></select>
+                <button class="btn-small" onclick="loadBankList()">🔍 筛选</button>
+                <button class="btn-small" onclick="openBankForm()">＋ 新增题目</button>
+            </div>
+            <div class="bank-list" id="bankList"></div>
+        </div>
+
+        <!-- 学生学情 -->
+        <div class="tab-panel hidden" id="teacherAnalytics">
+            <h2>📊 学生学情</h2>
+            <div class="bank-filter">
+                <select id="aClass"><option value="">全部班级</option></select>
+                <select id="aMajor"><option value="">全部学科</option></select>
+                <select id="aPaper"><option value="">全部试卷（学情总览）</option></select>
+                <button class="btn-small" onclick="loadAnalytics()">🔍 筛选</button>
+            </div>
+            <div id="analyticsList" class="paper-list"></div>
+        </div>
+
+        <!-- 分发试卷 -->
+        <div class="tab-panel hidden" id="distributeView">
+            <button class="btn-small" onclick="backToHome()">← 返回我的试卷</button>
+            <h2 id="distributeTitle">分发试卷</h2>
+            <div class="bank-filter">
+                <select id="dClass"><option value="">全部班级</option></select>
+                <select id="dMajor"><option value="">全部学科</option></select>
+                <label class="chk-all"><input type="checkbox" id="dSelectAll" onchange="toggleSelectAllStudents()"> 全选当前筛选</label>
+                <button class="btn-small btn-primary-inline" id="btnDoDistribute">✅ 确认分发</button>
+            </div>
+            <div id="distributeList" class="student-check-list"></div>
+        </div>
+
+        <!-- 批改 -->
+        <div class="tab-panel hidden" id="gradeView">
+            <button class="btn-small" onclick="backToHome()">← 返回我的试卷</button>
+            <h2 id="gradeTitle">批改试卷</h2>
+            <div id="gradeList"></div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- 学生端 -->
+    <!-- ══════════════════════════════════════════ -->
+    <div id="studentApp" class="app hidden">
+        <nav class="top-tabs">
+            <button class="top-tab" id="tabStudentPapers" onclick="switchStudentTab('papers')">📚 我的试卷</button>
+            <button class="top-tab" id="tabStudentResult" onclick="switchStudentTab('result')">📄 成绩</button>
+            <button class="top-tab" id="tabStudentRecords" onclick="switchStudentTab('records')">📋 考勤与警告</button>
+        </nav>
+
+        <div class="tab-panel" id="studentPapersView">
+            <div id="studentPapersList" class="paper-list"></div>
+        </div>
+
+        <div class="tab-panel hidden" id="studentRecordsView">
+            <div id="studentRecordsContent" class="records-grid"></div>
+        </div>
+
+        <div class="tab-panel hidden" id="studentAnswerView">
+            <div class="answer-layout">
+                <aside class="answer-sidebar">
+                    <h3>答题卡</h3>
+                    <div class="q-grid" id="studentGrid"></div>
+                    <p class="q-legend"><span class="dot answered"></span> 已答　<span class="dot"></span> 未答</p>
+                </aside>
+                <div class="answer-main">
+                    <h2 id="studentPaperTitle"></h2>
+                    <div id="studentPaperContent"></div>
+                    <button class="btn-primary" id="btnStudentSubmit">📤 提交试卷</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-panel hidden" id="studentResultView">
+            <div id="studentResultContent" class="paper-list"></div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- 辅导员端 -->
+    <!-- ══════════════════════════════════════════ -->
+    <div id="counselorApp" class="app hidden">
+        <nav class="top-tabs">
+            <button class="top-tab" id="tabCounselorAnalytics" onclick="switchCounselorTab('analytics')">📊 学生学情</button>
+            <button class="top-tab" id="tabCounselorUsers" onclick="switchCounselorTab('users')">👥 账号管理</button>
+        </nav>
+
+        <div class="tab-panel" id="counselorAnalyticsView">
+            <h2>📊 学生学情（含考勤 / 请假 / 学业警告）</h2>
+            <div class="bank-filter">
+                <select id="cClass"><option value="">全部班级</option></select>
+                <select id="cMajor"><option value="">全部学科</option></select>
+                <button class="btn-small" onclick="loadCounselorAnalytics()">🔍 筛选</button>
+                <button class="btn-small btn-warn" onclick="autoDetect()">⚡ 自动检测学业警告</button>
+            </div>
+            <div id="counselorAnalyticsList" class="paper-list"></div>
+        </div>
+
+        <div class="tab-panel hidden" id="counselorUsersView">
+            <h2>👥 账号管理（学生 / 教师）</h2>
+            <div class="bank-filter">
+                <button class="btn-small" onclick="openUserForm()">＋ 新增账号</button>
+            </div>
+            <div id="counselorUserList" class="paper-list"></div>
+        </div>
+    </div>
+
+    <!-- 题库新增/编辑 弹窗 -->
+    <div class="modal hidden" id="bankFormModal">
+        <div class="modal-backdrop" onclick="closeBankForm()"></div>
+        <div class="modal-card">
+            <h3 id="bankFormTitle">新增题目</h3>
+            <div class="form-row">
+                <div class="form-group"><label>学科</label><input type="text" id="bfSubject"></div>
+                <div class="form-group"><label>题型</label><select id="bfType"><option>选择题</option><option>填空题</option><option>计算题</option><option>证明题</option><option>简答题</option></select></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>难度</label><select id="bfDifficulty"><option>基础</option><option selected>中等</option><option>难</option></select></div>
+                <div class="form-group"><label>来源</label><select id="bfSource"><option value="teacher">某位老师</option><option value="paper">试卷</option><option value="ai">AI</option></select></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>章节</label><input type="text" id="bfChapter"></div>
+                <div class="form-group"><label>知识点</label><input type="text" id="bfTopic"></div>
+            </div>
+            <div class="form-group"><label>题干（支持 LaTeX $...$）</label><textarea id="bfContent" rows="4"></textarea></div>
+            <div class="form-group"><label>答案</label><textarea id="bfAnswer" rows="2"></textarea></div>
+            <div class="form-group"><label>解析</label><textarea id="bfAnalysis" rows="2"></textarea></div>
+            <div class="modal-actions">
+                <button class="btn-small" onclick="closeBankForm()">取消</button>
+                <button class="btn-primary modal-save" id="bfSave">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 按错题知识点推题 弹窗 -->
+    <div class="modal hidden" id="practiceModal">
+        <div class="modal-backdrop" onclick="closePractice()"></div>
+        <div class="modal-card practice-card">
+            <h3 id="practiceTitle">按错题知识点推送练习</h3>
+            <p class="hint" id="practiceHint"></p>
+            <div class="practice-topics" id="practiceTopics"></div>
+            <div class="practice-list" id="practiceList"></div>
+            <div class="modal-actions">
+                <button class="btn-small" onclick="closePractice()">取消</button>
+                <button class="btn-primary modal-save" id="btnPracticeSave">✅ 生成练习卷并分发</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 辅导员：账号新增/编辑 弹窗 -->
+    <div class="modal hidden" id="userFormModal">
+        <div class="modal-backdrop" onclick="closeUserForm()"></div>
+        <div class="modal-card">
+            <h3 id="userFormTitle">新增账号</h3>
+            <div class="form-row">
+                <div class="form-group"><label>角色</label><select id="ufRole"><option value="student">学生</option><option value="teacher">教师</option></select></div>
+                <div class="form-group"><label>姓名</label><input type="text" id="ufName" placeholder="真实姓名"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>登录用户名</label><input type="text" id="ufUsername" placeholder="学生填学号"></div>
+                <div class="form-group" id="ufPasswordGroup"><label>初始密码</label><input type="password" id="ufPassword" placeholder="至少 4 位"></div>
+            </div>
+            <div id="ufStudentFields">
+                <div class="form-row">
+                    <div class="form-group"><label>学号</label><input type="text" id="ufStudentNo" placeholder="学生学号"></div>
+                    <div class="form-group"><label>班级</label><input type="text" id="ufClass" placeholder="如：1班"></div>
+                </div>
+                <div class="form-group"><label>专业</label><input type="text" id="ufMajor" placeholder="如：数学"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-small" onclick="closeUserForm()">取消</button>
+                <button class="btn-primary modal-save" id="ufSave">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 辅导员：学生记录（旷课/请假/警告）弹窗 -->
+    <div class="modal hidden" id="recordsModal">
+        <div class="modal-backdrop" onclick="closeRecords()"></div>
+        <div class="modal-card records-card">
+            <h3 id="recordsTitle">学生记录</h3>
+            <div id="recordsStudentInfo" class="hint"></div>
+            <div class="records-grid">
+                <div class="records-col">
+                    <div class="records-col-head">🏫 旷课记录 <button class="btn-small" onclick="openAddRecord('attendance')">＋</button></div>
+                    <div class="records-list" id="recAttendance"></div>
+                </div>
+                <div class="records-col">
+                    <div class="records-col-head">🌴 请假记录 <button class="btn-small" onclick="openAddRecord('leave')">＋</button></div>
+                    <div class="records-list" id="recLeave"></div>
+                </div>
+                <div class="records-col">
+                    <div class="records-col-head">⚠️ 学业警告 <button class="btn-small" onclick="openAddRecord('warning')">＋</button></div>
+                    <div class="records-list" id="recWarnings"></div>
+                </div>
+            </div>
+            <div id="addRecordBox" class="add-record hidden"></div>
+            <div class="modal-actions">
+                <button class="btn-small" onclick="closeRecords()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拍照上传（学生） -->
+    <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" hidden>
+</main>
+
+<footer>
+    <span>教师主责 · AI 辅助 · 结果可验 · 过程可审</span>
+    &nbsp;|&nbsp;
+    <span>四川大学 · 教学智能体大赛</span>
+</footer>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/renderer.js"></script>
+<script src="/static/js/questionbank.js"></script>
+<script src="/static/js/wizard.js"></script>
+<script src="/static/js/teacher.js"></script>
+<script src="/static/js/student.js"></script>
+<script src="/static/js/grade.js"></script>
+<script src="/static/js/counselor.js"></script>
+</body>
+</html>
