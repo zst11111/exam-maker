@@ -767,7 +767,9 @@ async def step5_alternatives(session_id: str, no: int = 0):
     question = next((q for q in questions if str(q.get("no")) == str(no)), {})
     system_prompt = read_skill_md()
 
-    user_prompt = f"""请针对下面这道题，生成 3 个**同考点、同题型、同难度**的备选变体（换情境/换数据，公式用 LaTeX $$...$$）。
+    user_prompt = f"""请针对下面这道题，生成 3 个**同考点、同题型、同难度、同分值**的完整备选题（换情境/换数据，公式用 LaTeX $$...$$）。
+
+每个备选必须是**可直接替换进试卷的完整题目**——含题干、答案、解析、题型、分值、章节、知识点、难度全部字段，**绝不允许只写"计算xx"这类残题**。
 
 ## 原题
 ```json
@@ -775,11 +777,11 @@ async def step5_alternatives(session_id: str, no: int = 0):
 ```
 
 严格按 JSON 返回（不要其他文字）：
-
 ```json
 {{
   "alternatives": [
-    {{"content": "变体1题干", "answer": "答案1", "analysis": "解析1"}}
+    {{"no": 1, "type": "选择题", "score": 5, "chapter": "第一章 行列式", "topic": "行列式计算", "difficulty": "基础",
+      "content": "完整题干（LaTeX 用 $$...$$）", "answer": "完整答案", "analysis": "完整解析"}}
   ]
 }}
 ```"""
@@ -806,7 +808,23 @@ async def step5_alternatives(session_id: str, no: int = 0):
                     yield stream_sse("text", delta)
             parsed = parse_json_block(full_response)
             alts = parsed.get("alternatives", []) if isinstance(parsed, dict) else []
-            yield stream_sse("result", json.dumps({"alternatives": alts}, ensure_ascii=False))
+            # 归一化：缺失字段从原题回填；无题干的残题直接丢弃
+            clean = []
+            for a in alts:
+                if not (a.get("content") or "").strip():
+                    continue
+                clean.append({
+                    "no": question.get("no"),
+                    "type": a.get("type") or question.get("type") or "",
+                    "score": a.get("score") or question.get("score") or 0,
+                    "chapter": a.get("chapter") or question.get("chapter") or "",
+                    "topic": a.get("topic") or question.get("topic") or "",
+                    "difficulty": a.get("difficulty") or question.get("difficulty") or "",
+                    "content": a["content"],
+                    "answer": a.get("answer") or "",
+                    "analysis": a.get("analysis") or "",
+                })
+            yield stream_sse("result", json.dumps({"alternatives": clean}, ensure_ascii=False))
             yield stream_sse("done", "alternatives_ready")
         except Exception as e:
             yield stream_sse("error", str(e))
