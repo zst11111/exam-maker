@@ -1,9 +1,9 @@
-// 教师端：首页（统计+我的试卷）、分发、学情
-const _T_TABS = { home: 'tabHome', wizard: 'tabWizard', bank: 'tabBank', analytics: 'tabAnalytics' };
+// 教师端：首页（统计+卷库）、考试管理、分发、学情
+const _T_TABS = { home: 'tabHome', wizard: 'tabWizard', bank: 'tabBank', analytics: 'tabAnalytics', exam: 'tabExam' };
+const _ALL_VIEWS = ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView', 'examManageView', 'gradeOverviewView'];
 
 function switchTeacherTab(tab) {
-    ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView']
-        .forEach(id => { const el = $(id); if (el) el.classList.add('hidden'); });
+    _ALL_VIEWS.forEach(id => { const el = $(id); if (el) el.classList.add('hidden'); });
     Object.entries(_T_TABS).forEach(([k, id]) => {
         const el = $(id); if (el) el.classList.toggle('active', k === tab);
     });
@@ -11,47 +11,289 @@ function switchTeacherTab(tab) {
     else if (tab === 'wizard') { $('wizardWrap').classList.remove('hidden'); }
     else if (tab === 'bank') { $('bankView').classList.remove('hidden'); loadBankList(); }
     else if (tab === 'analytics') { $('teacherAnalytics').classList.remove('hidden'); loadAnalytics(); }
+    else if (tab === 'exam') { $('examManageView').classList.remove('hidden'); loadExamManage(); }
 }
 
 function backToHome() { switchTeacherTab('home'); }
 
+let _papersCache = [];
+let _papersTab = 'formal';
+
 async function loadHome() {
     const d = await authedJson('/api/papers');
-    const papers = d.papers || [];
-    const stat = { total: papers.length, dist: 0, sub: 0, graded: 0 };
-    papers.forEach(p => { stat.dist += p.distributed_count || 0; stat.sub += p.submitted_count || 0; stat.graded += p.graded_count || 0; });
+    _papersCache = d.papers || [];
+    const stat = { sub: 0, graded: 0, ongoing: 0 };
+    _papersCache.forEach(p => {
+        stat.sub += p.submitted_count || 0;
+        stat.graded += p.graded_count || 0;
+        if (!p.is_practice && (p.distributed_count || 0) > 0 && !p.published) stat.ongoing++;
+    });
+    const ungraded = Math.max(0, stat.sub - stat.graded);
     $('statCards').innerHTML = `
-        <div class="stat-card"><div class="stat-num">${stat.total}</div><div class="stat-label">我的试卷</div></div>
-        <div class="stat-card"><div class="stat-num">${stat.dist}</div><div class="stat-label">已分发人次</div></div>
-        <div class="stat-card"><div class="stat-num">${stat.sub}</div><div class="stat-label">已提交</div></div>
-        <div class="stat-card"><div class="stat-num">${stat.graded}</div><div class="stat-label">已批改</div></div>`;
-    $('myPapers').innerHTML = papers.length ? papers.map(p => `
-        <div class="paper-card">
+        <div class="stat-card" onclick="openGradeOverview('submitted')">
+            <div class="stat-num">${stat.sub}</div><div class="stat-label">已提交</div>
+        </div>
+        <div class="stat-card" onclick="openGradeOverview('graded')">
+            <div class="stat-num">${stat.graded}</div><div class="stat-label">已批改</div>
+        </div>
+        <div class="stat-card" onclick="openGradeOverview('ungraded')">
+            <div class="stat-num">${ungraded}</div><div class="stat-label">未批改</div>
+        </div>
+        <div class="stat-card" onclick="switchTeacherTab('exam')">
+            <div class="stat-num">${stat.ongoing}</div><div class="stat-label">进行中的考试</div>
+        </div>`;
+    renderPapersTabs();
+}
+
+function renderPapersTabs() {
+    const formal = _papersCache.filter(p => !p.is_practice);
+    const practice = _papersCache.filter(p => p.is_practice);
+    $('myPapersFormal').innerHTML = formal.length
+        ? formal.map(paperCard).join('')
+        : '<p class="empty-row">还没有正式试卷，去「出试卷」页创建一张吧</p>';
+    $('myPapersPractice').innerHTML = practice.length
+        ? practice.map(practiceCard).join('')
+        : '<p class="empty-row">还没有错题推送卷（批改后点「🎯 按错题推练习」生成）</p>';
+}
+
+function switchPapersTab(tab) {
+    _papersTab = tab;
+    $('papersTabFormal').classList.toggle('active', tab === 'formal');
+    $('papersTabPractice').classList.toggle('active', tab === 'practice');
+    $('myPapersFormal').classList.toggle('hidden', tab !== 'formal');
+    $('myPapersPractice').classList.toggle('hidden', tab !== 'practice');
+}
+
+// ── 正式试卷卡片 ──
+function paperCard(p) {
+    return `
+    <div class="paper-card">
+        <div class="paper-card-head">
+            <span class="paper-card-title" style="cursor:pointer" onclick="openPaperMeta('edit', ${p.id})" title="点击改名">📄 ${esc(p.title)}</span>
+            <span class="tag">${esc(p.subject || '未指定学科')}</span>
+            <span class="tag">${p.question_count} 题</span>
+            <span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>
+        </div>
+        <div class="paper-card-meta">
+            创建于 ${esc((p.created_at || '').slice(0, 16))} · 时长 ${p.duration || 120} 分钟 · 总分 ${p.total_score ?? 0}
+            ${p.remark ? ` · 📝 ${esc(p.remark)}` : ''}
+        </div>
+        <div class="paper-card-stats">
+            <span class="dist-link" onclick="toggleDistList(${p.id})">📤 分发 ${p.distributed_count}${p.distributed_count ? ' ▾' : ''}</span>
+            <span>📥 提交 ${p.submitted_count}</span>
+            <span>✅ 批改 ${p.graded_count}</span>
+        </div>
+        <div class="dist-detail hidden" id="distDetail_${p.id}">
+            ${(p.distributions || []).length ? p.distributions.map(d => `
+                <div class="dist-row">
+                    <span>${esc(d.name)}</span>
+                    <span class="tag">${esc(d.class_name || '')}</span>
+                    <span class="hint">${esc(d.student_no || '')}</span>
+                    <span class="tag status-${esc(d.status || 'none')}">${d.status === 'graded' ? '已批改' : (d.status === 'submitted' ? '已提交' : '未作答')}</span>
+                    ${d.status === 'graded' ? `<span>得分 ${d.total_score ?? '—'}</span>` : ''}
+                </div>`).join('') : '<span class="hint">未分发</span>'}
+        </div>
+        <div class="paper-card-actions">
+            <button class="btn-small" onclick="openDistribute(${p.id})">📤 分发</button>
+            <button class="btn-small" onclick="openGrade(${p.id})">✍️ 批改</button>
+            <button class="btn-small" onclick="openPaperMeta('edit', ${p.id})">✏️ 编辑</button>
+            <button class="btn-small btn-danger" onclick="deleteMyPaper(${p.id})">🗑 删除</button>
+        </div>
+    </div>`;
+}
+
+// ── 错题推送卷卡片（无发布成绩层）──
+function practiceCard(p) {
+    const d = (p.distributions || [])[0] || {};
+    const st = d.status || 'none';
+    const stLabel = { graded: '✅ 已批改', submitted: '⏳ 已提交待批改', none: '📝 未作答' }[st] || '📝 未作答';
+    return `
+    <div class="paper-card">
+        <div class="paper-card-head">
+            <span class="paper-card-title">📄 ${esc(p.title)}</span>
+            <span class="tag">🏷️ 练习卷</span>
+            <span class="tag">${esc(p.subject || '')}</span>
+            <span class="tag status-${esc(st)}">${stLabel}</span>
+        </div>
+        <div class="paper-card-meta">
+            创建于 ${esc((p.created_at || '').slice(0, 16))} · 共 ${p.question_count} 题
+            ${d.name ? ` · 学生：${esc(d.name)}（${esc(d.class_name || '')}）` : ''}
+        </div>
+        <div class="paper-card-stats">
+            <span class="dist-link" onclick="toggleDistList(${p.id})">作答详情${st !== 'none' ? ' ▾' : ''}</span>
+        </div>
+        <div class="dist-detail hidden" id="distDetail_${p.id}"></div>
+        <div class="paper-card-actions">
+            <button class="btn-small" onclick="openGrade(${p.id})">✍️ 批改</button>
+            <button class="btn-small btn-danger" onclick="deleteMyPaper(${p.id})">🗑 删除</button>
+        </div>
+    </div>`;
+}
+
+// ── 分发名单展开（正式卷内联；练习卷懒加载逐题作答）──
+async function toggleDistList(pid) {
+    const el = $('distDetail_' + pid);
+    if (!el) return;
+    const p = _papersCache.find(x => x.id === pid);
+    if (!el.classList.contains('hidden')) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    if (p && p.is_practice) {
+        el.innerHTML = '加载中…';
+        try {
+            const d = await authedJson(`/api/papers/${pid}/submissions`);
+            const sub = (d.submissions || [])[0];
+            if (!sub) { el.innerHTML = '<span class="hint">学生尚未作答</span>'; return; }
+            const fmap = {}; (sub.ai_feedback || []).forEach(f => fmap[f.no] = f);
+            const amap = {}; (sub.answers || []).forEach(a => amap[a.no] = a);
+            el.innerHTML = (d.questions || []).length ? d.questions.map(q => {
+                const f = fmap[q.no] || {};
+                const a = amap[q.no] || {};
+                const got = f.score != null ? (f.score + ' / ' + (f.max ?? q.score)) : '未评';
+                const ans = a.answer_text ? esc(String(a.answer_text).slice(0, 40)) : '未作答';
+                return `<div class="dist-row">
+                    <span class="tag">第 ${q.no} 题</span>
+                    <span class="hint">${ans}</span>
+                    <span class="${f.correct ? 'ok' : (f.correct === false ? 'bad' : '')}">${got}</span>
+                </div>`;
+            }).join('') : '<span class="hint">学生尚未作答</span>';
+        } catch (e) { el.innerHTML = '<span class="hint">加载失败</span>'; }
+    }
+}
+
+// ── 批改总览（统计框下钻）──
+const _GRADE_LABEL = { submitted: '已提交', graded: '已批改', ungraded: '未批改' };
+let _gradeOverviewFilter = 'submitted';
+
+function openGradeOverview(filter) {
+    _gradeOverviewFilter = filter;
+    _ALL_VIEWS.forEach(id => { const el = $(id); if (el) el.classList.add('hidden'); });
+    $('gradeOverviewView').classList.remove('hidden');
+    renderGradeOverview();
+}
+
+function renderGradeOverview() {
+    $('gradeOverviewTitle').textContent = '批改总览：' + _GRADE_LABEL[_gradeOverviewFilter];
+    const rows = [];
+    _papersCache.forEach(p => {
+        const match = (p.distributions || []).filter(d => {
+            if (_gradeOverviewFilter === 'graded') return d.status === 'graded';
+            if (_gradeOverviewFilter === 'ungraded') return d.status === 'submitted';
+            return d.status != null;
+        });
+        if (!match.length) return;
+        rows.push(`<div class="paper-card">
             <div class="paper-card-head">
                 <span class="paper-card-title">📄 ${esc(p.title)}</span>
-                <span class="tag">${esc(p.subject || '未指定学科')}</span>
+                <span class="tag">${esc(p.subject || '')}</span>
                 <span class="tag">${p.question_count} 题</span>
             </div>
-            <div class="paper-card-meta">
-                创建于 ${esc((p.created_at || '').slice(0, 16))} · 时长 ${p.duration || 120} 分钟 · 总分 ${p.total_score ?? 0}
-            </div>
-            <div class="paper-card-stats">
-                <span>📤 分发 ${p.distributed_count}</span>
-                <span>📥 提交 ${p.submitted_count}</span>
-                <span>✅ 批改 ${p.graded_count}</span>
-            </div>
-            <div class="paper-card-actions">
-                <button class="btn-small" onclick="openDistribute(${p.id})">📤 分发</button>
-                <button class="btn-small" onclick="openGrade(${p.id})">✍️ 批改</button>
-                <button class="btn-small btn-danger" onclick="deleteMyPaper(${p.id})">🗑 删除</button>
-            </div>
-        </div>`).join('') : '<p class="empty-row">还没有试卷，去「出试卷」页创建一张吧</p>';
+            ${match.map(d => `
+                <div class="dist-row">
+                    <span>${esc(d.name)}</span>
+                    <span class="tag">${esc(d.class_name || '')}</span>
+                    <span class="hint">${esc(d.student_no || '')}</span>
+                    <span class="tag status-${esc(d.status)}">${d.status === 'graded' ? '已批改' : '已提交'}</span>
+                    ${d.status === 'graded' ? `<span>得分 ${d.total_score ?? '—'}</span>` : ''}
+                    <button class="btn-small" onclick="openGrade(${p.id})">✍️ 去批改</button>
+                </div>`).join('')}
+        </div>`);
+    });
+    $('gradeOverviewList').innerHTML = rows.join('') || '<p class="empty-row">该状态下暂无提交</p>';
+}
+
+// ── 考试管理 ──
+async function loadExamManage() {
+    const d = await authedJson('/api/papers');
+    _papersCache = d.papers || [];
+    const exams = _papersCache.filter(p => !p.is_practice && (p.distributed_count || 0) > 0);
+    $('examManageList').innerHTML = exams.length
+        ? exams.map(examRow).join('')
+        : '<p class="empty-row">暂无已分发的正式考试</p>';
+}
+
+function examRow(p) {
+    const dist = p.distributed_count || 0, sub = p.submitted_count || 0, graded = p.graded_count || 0;
+    return `
+    <div class="paper-card" style="cursor:pointer" onclick="openGrade(${p.id})">
+        <div class="paper-card-head">
+            <span class="paper-card-title">📄 ${esc(p.title)}</span>
+            <span class="tag">${p.question_count} 题 / 总分 ${p.total_score ?? 0}</span>
+            <span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>
+        </div>
+        <div class="paper-card-stats">
+            <span>分发 ${dist} 人</span>
+            <span>已交 ${sub} / 未交 ${dist - sub}</span>
+            <span>已批改 ${graded} / 未批改 ${sub - graded}</span>
+        </div>
+        <div class="paper-card-actions">
+            <button class="btn-small" onclick="event.stopPropagation(); openGrade(${p.id})">✍️ 去批改</button>
+            ${p.published ? '' : `<button class="btn-small btn-primary-inline" onclick="event.stopPropagation(); publishPaper(${p.id})">📣 发布成绩</button>`}
+        </div>
+    </div>`;
+}
+
+async function publishPaper(pid) {
+    if (!confirm('确定发布整卷成绩？发布后学生端将可见所有已批改分数与反馈。')) return;
+    await authedJson(`/api/papers/${pid}/publish`, { method: 'POST' });
+    alert('成绩已发布，学生端现在可以查看分数');
+    await loadExamManage();
+    await loadHome();
+    openGrade(pid);
+}
+
+// ── 改名/备注弹窗 ──
+let _paperMetaMode = 'edit', _paperMetaId = null;
+
+function openPaperMeta(mode, pid) {
+    _paperMetaMode = mode; _paperMetaId = pid || null;
+    const p = pid ? (_papersCache.find(x => x.id === pid) || {}) : {};
+    $('paperMetaTitle').textContent = pid ? '编辑试卷信息' : '保存试卷';
+    $('pmTitle').value = pid ? (p.title || '') : ((typeof currentPaperMeta === 'function' ? currentPaperMeta().title : '') || '');
+    $('pmRemark').value = pid ? (p.remark || '') : '';
+    $('paperMetaModal').classList.remove('hidden');
+    $('pmTitle').focus();
+}
+
+function closePaperMeta() { $('paperMetaModal').classList.add('hidden'); }
+
+$('pmSave').addEventListener('click', async () => {
+    const title = $('pmTitle').value.trim();
+    const remark = $('pmRemark').value.trim();
+    if (!title) { alert('试卷标题不能为空'); return; }
+    if (_paperMetaMode === 'save') {
+        await saveNewPaper(title, remark);
+    } else if (_paperMetaId) {
+        await authedJson(`/api/papers/${_paperMetaId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, remark }),
+        });
+        closePaperMeta();
+        loadHome();
+    }
+});
+
+async function saveNewPaper(title, remark) {
+    if (!S.questions || S.questions.length === 0) { alert('请先生成试卷'); return; }
+    const meta = currentPaperMeta();
+    const total = S.questions.reduce((s, q) => s + (q.score || 0), 0);
+    try {
+        await authedJson('/api/papers', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title, remark, subject: meta.subject, duration: meta.duration,
+                total_score: total, questions: S.questions,
+            }),
+        });
+        closePaperMeta();
+        alert('已保存到「我的试卷」');
+    } catch (e) { alert('保存失败：' + (e && e.message ? e.message : e)); }
 }
 
 async function deleteMyPaper(pid) {
     if (!confirm('确定删除该试卷？将同时删除其分发与提交记录。')) return;
     await authedJson(`/api/papers/${pid}`, { method: 'DELETE' });
-    loadHome();
+    await loadHome();
+    await loadExamManage();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -72,8 +314,8 @@ async function openDistribute(pid) {
     // 填充筛选下拉
     fillOptions('dClass', _distStudents.map(s => s.class_name));
     fillOptions('dMajor', _distStudents.map(s => s.major));
-    ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView']
-        .forEach(id => $(id).classList.add('hidden'));
+    ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView', 'examManageView', 'gradeOverviewView']
+        .forEach(id => { const el = $(id); if (el) el.classList.add('hidden'); });
     $('distributeView').classList.remove('hidden');
     renderDistributeList();
 }
