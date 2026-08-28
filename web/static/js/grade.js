@@ -118,7 +118,7 @@ async function aiGrade(sid) {
 async function finalizeGrade(sid) {
     const fb = _feedbacks[sid] || [];
     const ungraded = fb.filter(f => f.score == null).length;
-    if (ungraded && !confirm(`还有 ${ungraded} 题未评分，将按 0 分计，确认发布？`)) return;
+    if (ungraded && !confirm(`还有 ${ungraded} 题未评分，将按 0 分计，确认定稿？`)) return;
     const clean = fb.map(f => Object.assign({}, f, { score: f.score == null ? 0 : Number(f.score) }));
     const total = clean.reduce((t, f) => t + (Number(f.score) || 0), 0);
     await authedJson(`/api/submissions/${sid}/finalize`, {

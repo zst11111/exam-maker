@@ -237,6 +237,9 @@ async def student_get_paper(pid: int, request: Request):
         }
     else:
         p["submission"] = None
+    p.pop("remark", None)
+    p.pop("published_at", None)
+    p.pop("teacher_id", None)
     return p
 
 

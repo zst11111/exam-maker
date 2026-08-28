@@ -10,7 +10,7 @@
 
 | # | 操作 | 预期 | 验证状态 |
 |---|---|---|---|
-| 1 | 教师登录 → 首页 | 四框数字正确：已提交/已批改/未批改/进行中的考试 | 数字口径 API 已自动验证 ✓（submitted_count/graded_count/distributed_count）；四框 UI 渲染需人工浏览器验证 |
+| 1 | 教师登录 → 首页 | 四框数字正确：已提交/已批改/未批改/进行中的考试 | 已提交/已批改/未批改 数字口径 API 已自动验证 ✓（submitted_count/graded_count/distributed_count）；「进行中的考试」为客户端计算（teacher.js loadHome 中 `!is_practice && distributed_count>0 && !published`，ongoing 口径未被冒烟覆盖）需人工浏览器验证 |
 | 2 | 点「已提交/已批改/未批改」框 | 进批改总览，行内学生+状态+「去批改」 | 需人工浏览器验证 |
 | 3 | 卷库「正式试卷」tab | 卡片有发布徽标（灰未发布/绿已发布）、「已分发 N」可展开名单 | published/distributions/distributed_count 字段 API 已自动验证 ✓；徽标与名单展开需人工浏览器验证 |
 | 4 | 卷库「错题推送卷」tab | 显示「张三·错题巩固」、学生名+班级、作答状态；展开可见逐题对错得分；**无发布成绩按钮** | is_practice 字段与「练习卷发布被拒(400)」API 已自动验证 ✓；卡片渲染需人工浏览器验证 |
