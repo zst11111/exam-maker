@@ -238,11 +238,40 @@ btnUpload.addEventListener('click', async () => {
 });
 
 // 不上传真题，按专业+年级+期中/期末直接生成知识点大纲
+// 教科书上传（出题大纲依据）
+const tbDrop = $('textbookDropZone'), tbInput = $('textbookInput');
+tbDrop.addEventListener('click', () => tbInput.click());
+tbInput.addEventListener('change', () => {
+    if (!tbInput.files[0]) return;
+    S.textbookFile = tbInput.files[0];
+    $('textbookFileList').innerHTML = `<span class="file-tag">📖 ${esc(S.textbookFile.name)}</span>`;
+    $('textbookStatus').textContent = '已选择，点击「上传教科书」提取目录';
+});
+$('btnUploadTextbook').addEventListener('click', async () => {
+    if (!S.textbookFile) { alert('请先选择教科书文件'); return; }
+    if (!S.sessionId) {
+        const fd = new FormData();
+        fd.append('course', $('course').value); fd.append('scope', $('scope').value); fd.append('subject', $('subject').value);
+        const r = await fetch('/api/session/start', { method: 'POST', body: fd });
+        S.sessionId = (await r.json()).session_id;
+    }
+    const fd = new FormData(); fd.append('textbook', S.textbookFile);
+    const r = await fetch(`/api/session/${S.sessionId}/step2/upload-textbook`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.ok) {
+        S.textbook = d;
+        $('textbookStatus').textContent = `✅ 已上传：${d.filename}（${d.text_length} 字符），目录${d.outline ? '已提取' : '未识别'}。生成大纲时将以此为准。`;
+    } else {
+        alert('上传失败：' + JSON.stringify(d));
+    }
+});
+
 $('btnGenSyllabus').addEventListener('click', async () => {
+    const subject = $('sylSubject').value.trim();
     const major = $('sylMajor').value.trim();
     const grade = $('sylGrade').value;
     const phase = document.querySelector('input[name="sylPhase"]:checked')?.value || '期中';
-    if (!major) { alert('请先填写专业'); return; }
+    if (!subject && !major) { alert('请先填写学科或专业'); return; }
 
     if (!S.sessionId) {
         const fd = new FormData();
@@ -268,7 +297,7 @@ $('btnGenSyllabus').addEventListener('click', async () => {
     analysisLog.innerHTML = '';
     analysisProgress.style.width = '10%';
 
-    const qs = new URLSearchParams({ major, grade, phase });
+    const qs = new URLSearchParams({ subject, major, grade, phase });
     try {
         await streamSSE(`/api/session/${S.sessionId}/step2/generate-syllabus?${qs.toString()}`, {
             log: (d) => {
@@ -480,7 +509,11 @@ function renderStructureTable() {
                     <option value="难" ${q.difficulty==='难'?'selected':''}>难</option>
                 </select>
             </td>
-            <td><button class="btn-del-row" onclick="deleteQuestionRow(this)">×</button></td>
+            <td>
+                <button class="btn-small" onclick="moveStructureRow(this, -1)">↑</button>
+                <button class="btn-small" onclick="moveStructureRow(this, 1)">↓</button>
+                <button class="btn-del-row" onclick="deleteQuestionRow(this)">×</button>
+            </td>
         </tr>`;
     }).join('');
 }
@@ -508,6 +541,17 @@ function syncStructureFromTable() {
 
 function deleteQuestionRow(btn) {
     btn.closest('tr').remove();
+    syncStructureFromTable();
+    renderStructureTable();
+}
+
+function moveStructureRow(btn, delta) {
+    const tr = btn.closest('tr');
+    const rows = [...document.querySelectorAll('#structureBody tr')];
+    const idx = rows.indexOf(tr);
+    const j = idx + delta;
+    if (j < 0 || j >= rows.length) return;
+    tr.parentNode.insertBefore(tr, j < idx ? rows[j] : rows[j].nextSibling);
     syncStructureFromTable();
     renderStructureTable();
 }
@@ -630,21 +674,8 @@ $('btnImportBank').addEventListener('click', async () => {
     alert(`已入库 ${d.imported} 道题`);
 });
 
-$('btnSavePaper').addEventListener('click', async () => {
+$('btnSavePaper').addEventListener('click', () => {
     if (!S.questions || S.questions.length === 0) { alert('请先生成试卷'); return; }
-    const meta = currentPaperMeta();
-    const total = S.questions.reduce((s, q) => s + (q.score || 0), 0);
-    try {
-        await authedJson('/api/papers', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title: meta.title, subject: meta.subject, duration: meta.duration,
-                total_score: total, questions: S.questions,
-            }),
-        });
-        alert('已保存到「我的试卷」');
-    } catch (e) {
-        alert('保存失败：' + (e && e.message ? e.message : e));
-    }
+    openPaperMeta('save', null);   // 弹窗填标题+备注，确认后 saveNewPaper POST
 });
 goStep(1);
