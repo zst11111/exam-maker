@@ -203,7 +203,13 @@ async def list_distributions(pid: int, request: Request):
 @router.get("/student/papers")
 async def student_papers(request: Request):
     u = auth.require_role(request, "student")
-    return {"papers": db.list_student_papers(u["id"])}
+    papers = db.list_student_papers(u["id"])
+    for p in papers:
+        visible = bool(p.get("is_practice")) or bool(p.get("published"))
+        p["score_visible"] = visible
+        if not visible:
+            p["score"] = None
+    return {"papers": papers}
 
 
 @router.get("/student/papers/{pid}")
@@ -212,16 +218,21 @@ async def student_get_paper(pid: int, request: Request):
     if not db.has_distribution(pid, u["id"]):
         raise HTTPException(status_code=404, detail="该试卷未分发给你")
     p = db.get_paper(pid)
+    score_visible = bool(p.get("is_practice")) or bool(p.get("published"))
+    p["published"] = bool(p.get("published"))
+    p["is_practice"] = bool(p.get("is_practice"))
+    p["score_visible"] = score_visible
     p["questions"] = _json_loads(p["questions_json"], [])
     p.pop("questions_json", None)
     sub = db.get_submission(pid, u["id"])
     if sub:
         p["submission"] = {
-            "id": sub["id"], "status": sub["status"], "total_score": sub["total_score"],
-            "ai_feedback": _json_loads(sub["ai_feedback_json"], []),
+            "id": sub["id"], "status": sub["status"],
+            "total_score": sub["total_score"] if score_visible else None,
+            "ai_feedback": _json_loads(sub["ai_feedback_json"], []) if score_visible else [],
             "answers": _json_loads(sub["answers_json"], []),
             "photos": _json_loads(sub["photos_json"], {}),
-            "comment": sub.get("comment") or "",
+            "comment": (sub.get("comment") or "") if score_visible else "",
             "submitted_at": sub["submitted_at"],
         }
     else:

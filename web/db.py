@@ -401,7 +401,7 @@ def list_student_papers(student_id: int) -> List[Dict[str, Any]]:
     conn = get_conn()
     rows = conn.execute("""
         SELECT p.id, p.title, p.subject, p.duration, p.total_score, p.created_at,
-               p.is_practice,
+               p.is_practice, p.published,
                s.id AS sub_id, s.status AS sub_status, s.total_score AS score, s.submitted_at
         FROM distributions d
         JOIN papers p ON p.id = d.paper_id
