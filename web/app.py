@@ -413,9 +413,9 @@ async def step2_generate_syllabus(session_id: str, subject: str = "", major: str
             iter([stream_sse("error", "会话不存在")]),
             media_type="text/event-stream",
         )
-    if not major:
+    if not subject and not major:
         return StreamingResponse(
-            iter([stream_sse("error", "请填写专业")]),
+            iter([stream_sse("error", "请填写学科或专业")]),
             media_type="text/event-stream",
         )
 
