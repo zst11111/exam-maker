@@ -56,7 +56,9 @@ async function loadStudentPapers() {
             <div class="paper-card-stats">
                 <span>时长 ${p.duration || 120} 分钟</span>
                 <span class="tag status-${esc(p.sub_status || 'none')}">${paperStatusLabel(p.sub_status)}</span>
-                ${p.sub_status === 'graded' ? `<span>得分 ${p.score}</span>` : ''}
+                ${p.sub_status === 'graded' ? (p.score_visible
+                    ? `<span>得分 ${p.score}</span>`
+                    : `<span class="tag">⏳ 成绩待发布</span>`) : ''}
             </div>
             <div class="paper-card-actions">
                 <button class="btn-small" onclick="openStudentPaper(${p.id})">
@@ -68,7 +70,7 @@ async function loadStudentPapers() {
 
 async function loadStudentResults() {
     const d = await authedJson('/api/student/papers');
-    const graded = (d.papers || []).filter(p => p.sub_status === 'graded');
+    const graded = (d.papers || []).filter(p => p.sub_status === 'graded' && p.score_visible);
     $('studentResultContent').innerHTML = graded.length ? graded.map(p => `
         <div class="paper-card">
             <div class="paper-card-head">
@@ -87,6 +89,10 @@ async function loadStudentResults() {
 
 async function openStudentPaper(pid) {
     const p = await authedJson(`/api/student/papers/${pid}`);
+    if (p.submission && p.submission.status === 'graded' && !p.score_visible) {
+        alert('成绩待发布，请耐心等待老师发布');
+        return;
+    }
     if (p.submission && p.submission.status === 'graded') { showResult(pid); return; }
     if (p.submission && p.submission.status === 'submitted') {
         alert('已提交，请等待老师批改');
@@ -184,6 +190,7 @@ $('btnStudentSubmit').addEventListener('click', async () => {
 
 async function showResult(pid) {
     const p = await authedJson(`/api/student/papers/${pid}`);
+    if (p.submission && p.submission.status === 'graded' && !p.score_visible) { alert('成绩待发布'); return; }
     const sub = p.submission || {};
     const amap = {}; (sub.answers || []).forEach(a => amap[a.no] = a);
     const fmap = {}; (sub.ai_feedback || []).forEach(f => fmap[f.no] = f);
