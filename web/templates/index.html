@@ -52,6 +52,7 @@
             <button class="top-tab" id="tabWizard" onclick="switchTeacherTab('wizard')">📝 出试卷</button>
             <button class="top-tab" id="tabBank" onclick="switchTeacherTab('bank')">🗂️ 题库管理</button>
             <button class="top-tab" id="tabAnalytics" onclick="switchTeacherTab('analytics')">📊 学生学情</button>
+            <button class="top-tab" id="tabExam" onclick="switchTeacherTab('exam')">🏫 考试管理</button>
         </nav>
 
         <!-- 首页：统计卡 + 我的试卷 -->
@@ -60,7 +61,12 @@
             <div class="section-head">
                 <h2>我的试卷</h2>
             </div>
-            <div id="myPapers" class="paper-list"></div>
+            <div class="papers-tabs">
+                <button class="papers-tab active" id="papersTabFormal" onclick="switchPapersTab('formal')">正式试卷</button>
+                <button class="papers-tab" id="papersTabPractice" onclick="switchPapersTab('practice')">错题推送卷</button>
+            </div>
+            <div id="myPapersFormal" class="paper-list"></div>
+            <div id="myPapersPractice" class="paper-list hidden"></div>
         </div>
 
         <!-- 出试卷（5步向导，原 DOM 完整保留） -->
@@ -148,6 +154,14 @@
                             <div class="syllabus-divider">或：不传真题，按专业 / 年级直接生成知识点大纲</div>
                             <div class="form-row">
                                 <div class="form-group">
+                                    <label for="sylSubject">学科</label>
+                                    <input type="text" id="sylSubject" placeholder="如：数学" list="subjectList">
+                                    <datalist id="subjectList">
+                                        <option>数学</option><option>物理</option><option>化学</option>
+                                        <option>计算机</option><option>英语</option><option>临床医学</option>
+                                    </datalist>
+                                </div>
+                                <div class="form-group">
                                     <label for="sylMajor">专业</label>
                                     <input type="text" id="sylMajor" placeholder="如：数学 / 物理 / 化学" list="majorList">
                                     <datalist id="majorList">
@@ -172,6 +186,20 @@
                             <button type="button" class="btn-secondary" id="btnGenSyllabus" style="margin-top:12px">
                                 🤖 直接生成知识点大纲
                             </button>
+                            <div class="textbook-block">
+                                <div class="syllabus-divider">或：上传教科书（PDF/DOCX）生成大纲</div>
+                                <div class="drop-zone" id="textbookDropZone">
+                                    <div class="drop-zone-inner">
+                                        <span class="drop-icon">📖</span>
+                                        <p>点击选择教科书文件</p>
+                                        <p class="hint">支持 PDF / DOCX，提取目录+节选作为出题大纲依据</p>
+                                    </div>
+                                    <input type="file" id="textbookInput" accept=".pdf,.docx,.doc,.txt" hidden>
+                                </div>
+                                <div class="file-list" id="textbookFileList"></div>
+                                <button type="button" class="btn-secondary" id="btnUploadTextbook" style="margin-top:8px">📤 上传教科书</button>
+                                <div class="hint" id="textbookStatus"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -367,6 +395,20 @@
             <div id="analyticsList" class="paper-list"></div>
         </div>
 
+        <!-- 考试管理：已分发正式考试实时跟踪 -->
+        <div class="tab-panel hidden" id="examManageView">
+            <h2>🏫 考试管理</h2>
+            <p class="hint">已分发的正式考试实时跟踪：用的哪套卷、提交/批改进度、成绩发布</p>
+            <div id="examManageList" class="paper-list"></div>
+        </div>
+
+        <!-- 批改总览：统计框下钻 -->
+        <div class="tab-panel hidden" id="gradeOverviewView">
+            <button class="btn-small" onclick="backToHome()">← 返回首页</button>
+            <h2 id="gradeOverviewTitle">批改总览</h2>
+            <div id="gradeOverviewList" class="paper-list"></div>
+        </div>
+
         <!-- 分发试卷 -->
         <div class="tab-panel hidden" id="distributeView">
             <button class="btn-small" onclick="backToHome()">← 返回我的试卷</button>
@@ -384,6 +426,7 @@
         <div class="tab-panel hidden" id="gradeView">
             <button class="btn-small" onclick="backToHome()">← 返回我的试卷</button>
             <h2 id="gradeTitle">批改试卷</h2>
+            <button class="btn-small hidden" id="btnPublishPaper" onclick="publishPaper(_gradePaperId)">📣 发布整卷成绩</button>
             <div id="gradeList"></div>
         </div>
     </div>
@@ -478,6 +521,26 @@
             <div class="modal-actions">
                 <button class="btn-small" onclick="closeBankForm()">取消</button>
                 <button class="btn-primary modal-save" id="bfSave">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 试卷信息（保存时命名 + 卡片改名备注） -->
+    <div class="modal hidden" id="paperMetaModal">
+        <div class="modal-backdrop" onclick="closePaperMeta()"></div>
+        <div class="modal-card">
+            <h3 id="paperMetaTitle">试卷信息</h3>
+            <div class="form-group">
+                <label for="pmTitle">试卷标题</label>
+                <input type="text" id="pmTitle" placeholder="试卷名称">
+            </div>
+            <div class="form-group">
+                <label for="pmRemark">备注 <span class="hint">教师内部备注，学生不可见</span></label>
+                <textarea id="pmRemark" rows="2" placeholder="可选，如：期中卷 / 用于A班"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-small" onclick="closePaperMeta()">取消</button>
+                <button class="btn-primary modal-save" id="pmSave">保存</button>
             </div>
         </div>
     </div>
