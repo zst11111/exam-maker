@@ -1,5 +1,5 @@
 // 教师批改页：提交列表 + AI 批改 + 逐题改分/评语 + 总评 + 发布成绩 + 按错题推题
-let _gradePaperId = null, _gradeQuestions = [], _gradeSubs = [], _feedbacks = {}, _summaries = {};
+let _gradePaperId = null, _gradePaper = null, _gradeQuestions = [], _gradeSubs = [], _feedbacks = {}, _summaries = {};
 
 async function openGrade(pid) {
     _gradePaperId = pid;
@@ -16,9 +16,13 @@ async function openGrade(pid) {
     });
     const paper = await authedJson(`/api/papers/${pid}`);
     $('gradeTitle').textContent = '批改试卷：' + paper.title;
-    ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView']
-        .forEach(id => $(id).classList.add('hidden'));
+    ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView', 'examManageView', 'gradeOverviewView']
+        .forEach(id => { const el = $(id); if (el) el.classList.add('hidden'); });
     $('gradeView').classList.remove('hidden');
+    _gradePaperId = pid;
+    _gradePaper = paper;
+    const btnPub = $('btnPublishPaper');
+    if (btnPub) btnPub.classList.toggle('hidden', !!paper.is_practice || !!paper.published);
     renderGradeList();
 }
 
@@ -77,7 +81,7 @@ function gradeCard(s) {
         <div class="paper-card-actions">
             <button class="btn-small" onclick="aiGrade(${s.id})">🤖 AI 批改</button>
             <button class="btn-small" onclick="openPractice(${s.id})">🎯 按错题推练习</button>
-            <button class="btn-small btn-primary-inline" onclick="finalizeGrade(${s.id})">✅ 发布成绩</button>
+            <button class="btn-small btn-primary-inline" onclick="finalizeGrade(${s.id})">✅ 定稿</button>
         </div>
     </div>`;
 }
@@ -121,7 +125,7 @@ async function finalizeGrade(sid) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ feedback: clean, total_score: total, comment: _summaries[sid] || '' }),
     });
-    alert('成绩已发布');
+    alert('已定稿（结果已存，学生端将在你「发布整卷成绩」后可见）');
     openGrade(_gradePaperId);
 }
 
