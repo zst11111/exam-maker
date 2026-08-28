@@ -109,10 +109,19 @@ async function genReplaceAlt() {
                 window._alts = alts;
                 list.innerHTML = alts.length
                     ? alts.map((a, i) => `
-                        <div class="replace-item">
-                            <div>${renderMath(esc(a.content)).slice(0, 120)}…</div>
-                            <button class="btn-small" onclick="applyAlt(${_replaceNo}, ${i})">替换</button>
-                            <button class="btn-small" onclick="saveAlt(${_replaceNo}, ${i})">入库</button>
+                        <div class="replace-item replace-item-full">
+                            <div class="replace-item-meta">
+                                <span class="tag">${esc(a.type)}</span>
+                                <span class="tag">${a.score ?? 0} 分</span>
+                                <span class="tag">${esc(a.difficulty)}</span>
+                                ${a.topic ? `<span class="tag source-tag">${esc(a.topic)}</span>` : ''}
+                            </div>
+                            <div>${renderMath(escMath(a.content))}</div>
+                            ${a.answer ? `<div class="hint" style="margin-top:4px">答案：${renderMath(escMath(a.answer))}</div>` : ''}
+                            <div style="display:flex;gap:8px;margin-top:8px">
+                                <button class="btn-small" onclick="applyAlt(${_replaceNo}, ${i})">替换</button>
+                                <button class="btn-small" onclick="saveAlt(${_replaceNo}, ${i})">入库</button>
+                            </div>
                         </div>`).join('')
                     : '<p class="empty-row">未生成备选（可重试）</p>';
             },
@@ -136,6 +145,7 @@ function applyAlt(no, altIndex) {
     const q = (S.questions || []).find(x => String(x.no) === String(no));
     const a = window._alts?.[altIndex];
     if (!q || !a) return;
+    q.type = a.type; q.score = a.score; q.chapter = a.chapter; q.topic = a.topic; q.difficulty = a.difficulty;
     q.content = a.content; q.answer = a.answer; q.analysis = a.analysis;
     renderPaper(S.questions, $('paperTemplate').value, currentPaperMeta());
     closeReplace();
