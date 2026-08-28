@@ -146,6 +146,24 @@ def extract_text_from_file(filepath: Path, filename: str) -> str:
     return f"[不支持的文件格式: {suffix}]"
 
 
+def _build_textbook_outline(text: str, filename: str) -> str:
+    """从教科书全文提取「目录 + 节选正文」：识别章节标题行 + 正文开头节选。"""
+    heading_re = re.compile(
+        r'^(第[0-9一二三四五六七八九十百千]+[章篇章节]'
+        r'|[0-9]+(\.[0-9]+)*[、.．\s]'
+        r'|[一二三四五六七八九十]+[、])'
+    )
+    headings = []
+    for ln in text.splitlines():
+        s = ln.strip()
+        if s and len(s) < 40 and heading_re.match(s):
+            headings.append(s)
+    toc = "\n".join(headings[:80]) if headings else "（未识别到目录标题，以下为正文开头）"
+    excerpt = "\n".join(text.splitlines()[:120])
+    return (f"### 教科书目录\n{toc}\n\n"
+            f"### 正文节选（开头部分，供理解内容范围）\n{excerpt[:6000]}")
+
+
 def load_session(session_id: str) -> Dict:
     state_path = SESSIONS_DIR / session_id / "state.json"
     if state_path.exists():
@@ -364,8 +382,30 @@ async def step2_analyze(session_id: str):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+@app.post("/api/session/{session_id}/step2/upload-textbook")
+async def step2_upload_textbook(session_id: str, textbook: UploadFile = File(...)):
+    state = load_session(session_id)
+    if not state:
+        return JSONResponse({"error": "会话不存在"}, status_code=404)
+    content_bytes = await textbook.read()
+    if len(content_bytes) > 20 * 1024 * 1024:
+        return JSONResponse({"error": "教科书文件不能超过 20MB"}, status_code=400)
+    safe_name = textbook.filename or "unknown"
+    upload_dir = SESSIONS_DIR / session_id / "uploads"
+    upload_dir.mkdir(exist_ok=True)
+    filepath = upload_dir / f"textbook_{safe_name}"
+    filepath.write_bytes(content_bytes)
+    text = extract_text_from_file(filepath, safe_name)
+    outline = _build_textbook_outline(text, safe_name)
+    state["textbook"] = {"filename": safe_name, "text": text, "outline": outline}
+    state["current_step"] = 2
+    save_session(session_id, state)
+    return {"ok": True, "filename": safe_name, "text_length": len(text), "outline": outline[:2000]}
+
+
 @app.get("/api/session/{session_id}/step2/generate-syllabus")
-async def step2_generate_syllabus(session_id: str, major: str = "", grade: str = "", phase: str = ""):
+async def step2_generate_syllabus(session_id: str, subject: str = "", major: str = "",
+                                  grade: str = "", phase: str = ""):
     """SSE — 不上传真题，按「专业+年级+期中/期末」直接生成知识点大纲。"""
     state = load_session(session_id)
     if not state:
@@ -382,6 +422,15 @@ async def step2_generate_syllabus(session_id: str, major: str = "", grade: str =
     system_prompt = read_skill_md()
     phase_label = {"期中": "期中", "期末": "期末"}.get(phase, phase or "期中/期末")
 
+    textbook = state.get("textbook")
+    textbook_text = ""
+    if textbook:
+        textbook_text = (
+            f"\n\n## 教科书大纲（已上传：{textbook['filename']}）\n"
+            f"```\n{textbook['outline'][:12000]}\n```\n"
+            f"请**以上述教科书的目录与节选为准**，据此生成知识点大纲，章节名称尽量贴合教科书。"
+        )
+
     user_prompt = f"""你正在执行 **步骤 2：按教学大纲直接生成知识点清单**（不依赖真题）。
 
 请根据下面的课程信息，直接生成该课程在对应阶段的**知识点大纲**（章节 + 知识点 + 难度 + 考查频率），并给出典型题型结构建议。
@@ -390,9 +439,10 @@ async def step2_generate_syllabus(session_id: str, major: str = "", grade: str =
 - 专业：{major}
 - 年级：{grade or '未指定'}
 - 考试阶段：{phase_label}
-- 学科：{state.get('subject') or '未指定'}
+- 学科：{subject or state.get('subject') or '未指定'}
 - 课程：{state.get('course') or '未指定'}
 - 命题范围（如有）：{state.get('scope') or '未指定'}
+{textbook_text}
 
 请严格按 JSON 返回（不要其他文字）：
 
