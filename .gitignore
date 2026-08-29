@@ -1,0 +1,10 @@
+# SDD 工作区
+.superpowers/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 系统/编辑器
+.DS_Store

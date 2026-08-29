@@ -1,0 +1,29 @@
+% !TEX program = xelatex
+% 在 Overleaf 上请将编译器设置为 XeLaTeX（Menu -> Compiler -> XeLaTeX）
+% 通用试卷导言区（Overleaf 选 XeLaTeX 可编译）。理工科数学宏见下方 \DeclareMathOperator，
+% 换学科时可增删；文科卷用不到的宏留着无害。转 docx/md 前的 pandoc 安全替换见 references/io-and-conversion.md。
+\documentclass[UTF8,a4paper,11pt]{ctexart}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{extarrows}   % \xlongequal 等可伸长关系符
+\geometry{left=20mm,right=20mm,top=22mm,bottom=22mm}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\renewcommand{\arraystretch}{1.15}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\diag}{diag}
+\newcommand{\blank}{\underline{\hspace{2.8cm}}}        % 填空横线
+\def\T{\mathrm{T}}                                      % 转置
+\newcommand{\score}[1]{\hfill\mbox{\bfseries（#1分）}}  % 行末步骤分
+\newenvironment{pingfen}{\par\noindent\textbf{评分说明：}\begin{itemize}[leftmargin=2em,itemsep=0.1em,topsep=0.2em]}{\end{itemize}}
+\allowdisplaybreaks
+
+% 用法约定：
+% - 试题页：\section*{试卷N} + 每个题型一个 \subsection*（一、……（每小题x分，共计y分）…）
+% - 答案页：\section*{试卷N\quad 参考答案与评分标准}
+% - 每个得分步骤之后紧跟 \score{n}，display 公式的分值放在其后的文字行；主观题采分点用 pingfen 环境
+% - 理工科推导标注：\xrightarrow{\substack{r_2-2r_1\\ r_3-r_1}} / \xlongequal{...}（可伸长关系符，来自 extarrows）
+% - 超宽处理：过长的公式/变换链拆成两个 \[...\] 块（编译后搜 log 里的 Overfull）
