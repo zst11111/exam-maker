@@ -47,11 +47,26 @@ function renderCounselorAnalytics() {
     const keys = Object.keys(classMap).sort();
     $('counselorAnalyticsList').innerHTML = keys.length ? keys.map(k => {
         const cc = classMap[k];
+        const totalDist = cc.exams.reduce((t, e) => t + (e.agg.total || 0), 0);
+        const totalSub = cc.exams.reduce((t, e) => t + (e.agg.submitted || 0), 0);
+        const totalGraded = cc.exams.reduce((t, e) => t + (e.agg.graded || 0), 0);
+        const submitRatio = totalDist ? totalSub / totalDist : 0;
+        const gradeRatio = totalSub ? totalGraded / totalSub : 0;
         return `
         <div class="paper-card class-card">
             <div class="paper-card-head">
                 <span class="paper-card-title">🏫 ${esc(cc.name)}${cc.major ? ' · ' + esc(cc.major) : ''}</span>
                 <span class="tag">${cc.exams.length} 场考试</span>
+            </div>
+            <div class="exam-stats-grid">
+                <div class="exam-stat"><div class="stat-num-lg">${cc.exams.length}</div><div class="stat-label">考试数</div></div>
+                <div class="exam-stat"><div class="stat-num-lg ok">${totalSub}</div><div class="stat-label">提交人次</div></div>
+                <div class="exam-stat"><div class="stat-num-lg warn">${totalDist - totalSub}</div><div class="stat-label">未提交人次</div></div>
+                <div class="exam-stat"><div class="stat-num-lg">${totalGraded}</div><div class="stat-label">已批改人次</div></div>
+                <div class="exam-donuts">
+                    <div class="donut-item">${svgDonut(submitRatio, { label: Math.round(submitRatio * 100) + '%' })}<div class="stat-label">提交率</div></div>
+                    <div class="donut-item">${svgDonut(gradeRatio, { fg: '#10b981', label: Math.round(gradeRatio * 100) + '%' })}<div class="stat-label">批改率</div></div>
+                </div>
             </div>
             <div class="class-section">
                 <div class="class-subhead">📊 考试总览（点击进入查看本场考试详情）</div>
@@ -119,24 +134,59 @@ async function loadCounselorDaily() {
 function renderCounselorDaily() {
     const cls = $('cDClass').value, major = $('cDMajor').value;
     const list = _cStudents.filter(s => (!cls || s.class_name === cls) && (!major || s.major === major));
-    $('counselorDailyList').innerHTML = list.length ? list.map(s => `
-        <div class="paper-card">
-            <div class="paper-card-head">
-                <span class="paper-card-title">🧑‍🎓 ${esc(s.name)}</span>
-                <span class="tag">${esc(s.class_name)}</span>
-                <span class="tag">${esc(s.major)}</span>
-                <span class="hint">${esc(s.student_no)}</span>
+    if (!list.length) { $('counselorDailyList').innerHTML = '<p class="empty-row">暂无学生数据</p>'; return; }
+    const byClass = {};
+    list.forEach(s => {
+        const k = (s.class_name || '未分班') + '|' + (s.major || '');
+        (byClass[k] = byClass[k] || []).push(s);
+    });
+    $('counselorDailyList').innerHTML = Object.keys(byClass).sort().map(k => {
+        const [cn, mj] = k.split('|');
+        return dailyClassCard(cn, mj, byClass[k]);
+    }).join('');
+}
+
+function dailyClassCard(cn, mj, students) {
+    const n = students.length;
+    const noAttn = students.filter(s => (s.attendance_count || 0) === 0).length;   // 无旷课
+    const noLeave = students.filter(s => (s.leave_count || 0) === 0).length;       // 无请假
+    const need = students.filter(s => (s.attendance_count || 0) + (s.leave_count || 0) + (s.warning_count || 0) > 0).length;
+    const okRatio = n ? noAttn / n : 0;
+    const needRatio = n ? need / n : 0;
+    const tAttn = students.reduce((t, s) => t + (s.attendance_count || 0), 0);
+    const tLeave = students.reduce((t, s) => t + (s.leave_count || 0), 0);
+    const tWarn = students.reduce((t, s) => t + (s.warning_count || 0), 0);
+    return `
+    <div class="paper-card class-card">
+        <div class="paper-card-head">
+            <span class="paper-card-title">🏫 ${esc(cn)}${mj ? ' · ' + esc(mj) : ''}</span>
+            <span class="tag">${n} 名学生</span>
+        </div>
+        <div class="exam-stats-grid">
+            <div class="exam-stat"><div class="stat-num-lg">${tAttn}</div><div class="stat-label">旷课次数</div></div>
+            <div class="exam-stat"><div class="stat-num-lg">${tLeave}</div><div class="stat-label">请假次数</div></div>
+            <div class="exam-stat"><div class="stat-num-lg ${tWarn ? 'warn' : ''}">${tWarn}</div><div class="stat-label">警告次数</div></div>
+            <div class="exam-stat"><div class="stat-num-lg ${need ? 'warn' : 'ok'}">${need}</div><div class="stat-label">需关注人数</div></div>
+            <div class="exam-donuts">
+                <div class="donut-item">${svgDonut(okRatio, { label: Math.round(okRatio * 100) + '%' })}<div class="stat-label">无旷课率</div></div>
+                <div class="donut-item">${svgDonut(needRatio, { fg: '#f59e0b', label: Math.round(needRatio * 100) + '%' })}<div class="stat-label">需关注率</div></div>
             </div>
-            <div class="paper-card-stats">
-                <span>🏫 旷课 ${s.attendance_count || 0}</span>
-                <span>🌴 请假 ${s.leave_count || 0}</span>
-                <span class="${s.warning_count ? 'bad' : ''}">⚠️ 学业警告 ${s.warning_count || 0}</span>
-                <span>均分 ${s.avg_score ?? '—'}</span>
+        </div>
+        <div class="class-section">
+            <div class="class-subhead">👥 学生考勤（点击查看 / 记录旷课请假）</div>
+            <div class="class-roster">
+                ${students.map(s => `
+                    <div class="student-row" onclick="openRecords(${s.id})" title="查看 / 记录考勤请假">
+                        <span>🧑‍🎓 ${esc(s.name)}</span>
+                        <span class="hint">${esc(s.student_no || '')}</span>
+                        <span class="hint" style="margin-left:auto">均分 ${s.avg_score ?? '—'}</span>
+                        <span class="tag" title="旷课">🏫 ${s.attendance_count || 0}</span>
+                        <span class="tag" title="请假">🌴 ${s.leave_count || 0}</span>
+                        <span class="tag ${s.warning_count ? 'bad' : ''}" title="学业警告">⚠️ ${s.warning_count || 0}</span>
+                    </div>`).join('')}
             </div>
-            <div class="paper-card-actions">
-                <button class="btn-small" onclick="openRecords(${s.id})">📋 查看 / 记录考勤请假</button>
-            </div>
-        </div>`).join('') : '<p class="empty-row">暂无学生数据</p>';
+        </div>
+    </div>`;
 }
 
 async function autoDetect() {
@@ -247,21 +297,46 @@ let _editUid = null;
 async function loadCounselorUsers() {
     const d = await authedJson('/api/counselor/users');
     _allUsers = d.users || [];
-    $('counselorUserList').innerHTML = _allUsers.length ? _allUsers.map(u => `
-        <div class="paper-card">
-            <div class="paper-card-head">
-                <span class="paper-card-title">${u.role === 'teacher' ? '👨‍🏫' : (u.role === 'counselor' ? '🧑‍💼' : '🧑‍🎓')} ${esc(u.name)}</span>
-                <span class="tag">${u.role === 'teacher' ? '教师' : (u.role === 'counselor' ? '辅导员' : '学生')}</span>
-                <span class="hint">账号 ${esc(u.username)}</span>
-                ${u.role === 'student' ? `<span class="tag">${esc(u.class_name || '')}</span><span class="tag">${esc(u.major || '')}</span><span class="hint">学号 ${esc(u.student_no || '')}</span>` : ''}
+    const teachers = _allUsers.filter(u => u.role === 'teacher');
+    const students = _allUsers.filter(u => u.role === 'student');
+    const byClass = {};
+    students.forEach(s => {
+        const k = (s.class_name || '未分班') + '|' + (s.major || '');
+        (byClass[k] = byClass[k] || []).push(s);
+    });
+    const parts = [];
+    if (teachers.length) parts.push(usersClassCard('👨‍🏫 教师', teachers.length + ' 名教师', teachers));
+    Object.keys(byClass).sort().forEach(k => {
+        const [cn, mj] = k.split('|');
+        parts.push(usersClassCard(`🏫 ${esc(cn)}${mj ? ' · ' + esc(mj) : ''}`, byClass[k].length + ' 名学生', byClass[k]));
+    });
+    $('counselorUserList').innerHTML = parts.join('') || '<p class="empty-row">暂无用户</p>';
+}
+
+function usersClassCard(title, subtitle, users) {
+    return `
+    <div class="paper-card class-card">
+        <div class="paper-card-head">
+            <span class="paper-card-title">${title}</span>
+            <span class="tag">${subtitle}</span>
+        </div>
+        <div class="class-section">
+            <div class="class-roster">
+                ${users.map(u => `
+                    <div class="user-row">
+                        <span class="user-role">${u.role === 'teacher' ? '👨‍🏫' : '🧑‍🎓'}</span>
+                        <span class="user-name">${esc(u.name)}</span>
+                        <span class="hint">账号 ${esc(u.username)}</span>
+                        ${u.role === 'student' ? `<span class="hint">学号 ${esc(u.student_no || '')}</span><span class="hint">${esc(u.major || '')}</span>` : ''}
+                        <span class="user-actions">
+                            <button class="btn-small" onclick="openUserForm(${u.id})">✏️ 编辑</button>
+                            <button class="btn-small" onclick="resetPwd(${u.id})">🔑 重置密码</button>
+                            <button class="btn-small btn-danger" onclick="delUser(${u.id})">🗑 删除</button>
+                        </span>
+                    </div>`).join('')}
             </div>
-            <div class="paper-card-actions">
-                ${u.role !== 'counselor' ? `
-                <button class="btn-small" onclick="openUserForm(${u.id})">✏️ 编辑</button>
-                <button class="btn-small" onclick="resetPwd(${u.id})">🔑 重置密码</button>
-                <button class="btn-small btn-danger" onclick="delUser(${u.id})">🗑 删除</button>` : '<span class="hint">系统内置账号</span>'}
-            </div>
-        </div>`).join('') : '<p class="empty-row">暂无用户</p>';
+        </div>
+    </div>`;
 }
 
 function _userName(uid) { const u = (_allUsers || []).find(x => x.id === uid); return u ? u.name : String(uid); }

@@ -607,4 +607,9 @@ input[type="date"]:focus { outline: none; border-color: var(--primary); box-shad
 .class-roster{display:flex;flex-direction:column;gap:2px}
 .class-roster .student-row{padding:5px 8px}
 .class-roster .student-row:hover{background:#eef2ff}
+.user-row{display:flex;align-items:center;gap:8px;font-size:.84rem;padding:7px 8px;border-radius:8px;flex-wrap:wrap}
+.user-row:hover{background:#f8fafc}
+.user-name{font-weight:600}
+.user-actions{margin-left:auto;display:flex;gap:6px}
+@media (max-width:720px){.user-actions{margin-left:0}}
 @media (max-width:720px){.class-card .exam-stats-grid{grid-template-columns:repeat(2,1fr)}.class-card .exam-donuts{grid-column:1/-1;justify-content:center}}
