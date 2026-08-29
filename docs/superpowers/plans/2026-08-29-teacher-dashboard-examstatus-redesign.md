@@ -435,7 +435,7 @@ function examOverviewCard(p) {
             <span class="tag">${esc(p.subject || '未指定学科')}</span>
             ${p.is_practice ? '<span class="tag">🏷️ 练习</span>' : ''}
             <span class="tag">${p.question_count} 题 / 总分 ${p.total_score ?? 0}</span>
-            <span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>
+            ${p.is_practice ? '' : `<span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>`}
         </div>
         <div class="exam-stats-grid">
             <div class="exam-stat"><div class="stat-num-lg ok">${sub}</div><div class="stat-label">已提交</div></div>
@@ -479,7 +479,7 @@ function renderBoxPlots() {
 
 - [ ] **Step 4: pmSave 编辑分支 / deleteMyPaper / publishPaper 同步刷新卷库**
 
-- `pmSave` 编辑分支（`loadHome()` 之后）：追加 `refreshMyPapers();`
+- `pmSave` 编辑分支：改为 `await loadHome(); refreshMyPapers();`（**必须 await**——否则 refreshMyPapers 用旧 `_papersCache` 渲染，改名结果要切 tab 才可见）
 - `deleteMyPaper`（292-297 行）：在 `await loadHome(); await loadExamManage();` 后追加 `refreshMyPapers();`
 - `publishPaper`（235-242 行）末尾：把 `await loadHome(); openGrade(pid);` 改为 `await loadHome(); await loadExamManage(); refreshMyPapers();`（**发布后停留原地**，不再跳批改视图）
 
