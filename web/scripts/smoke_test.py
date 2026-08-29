@@ -96,6 +96,7 @@ def main():
         "questions_json": json.dumps([{"no": 1, "type": "选择题", "score": 5,
                                        "content": "2+2=?", "answer": "4"}], ensure_ascii=False),
         "is_practice": 1,
+        "is_wrong_push": 1,
     })
     req("POST", f"/api/papers/{prac}/distribute", t, body={"student_ids": [sid]})
     req("POST", f"/api/student/papers/{prac}/submit", s, body={"answers": [{"no": 1, "answer_text": "4"}], "photos": {}})
@@ -157,6 +158,25 @@ def main():
         assert all(d["sub_id"] is not None and d["total_score"] is None for d in sub_rows), "submitted 行契约不符"
     finally:
         db.delete_user(sb_id)
+
+    # v4.1: is_wrong_push 分类 + first_distributed_at
+    pl4 = req("GET", "/api/papers", t)["papers"]
+    f1 = next(x for x in pl4 if x["id"] == pid)   # 正式卷（已分发）
+    f2 = next(x for x in pl4 if x["id"] == prac)  # 错题练习卷（已分发）
+    assert f1["is_wrong_push"] is False
+    assert f2["is_wrong_push"] is True and f2["is_practice"] is True, "错题练习卷必须同时是练习卷"
+    assert f1["first_distributed_at"], "已分发的正式卷应有首次分发时间"
+    assert f2["first_distributed_at"], "已分发的错题练习卷应有首次分发时间"
+    # 未分发卷 first_distributed_at 应为 None（确定性构造）
+    nd_pid = req("POST", "/api/papers", t, body={
+        "title": "冒烟未分发卷", "subject": "数学", "duration": 120, "total_score": 100,
+        "questions": [{"no": 1, "type": "选择题", "score": 5, "content": "?", "answer": "?"}],
+    })["id"]
+    try:
+        f3 = next(x for x in req("GET", "/api/papers", t)["papers"] if x["id"] == nd_pid)
+        assert f3["first_distributed_at"] is None, "未分发卷应无首次分发时间"
+    finally:
+        req("DELETE", f"/api/papers/{nd_pid}", t)
 
     # 清理
     req("DELETE", f"/api/papers/{pid}", t)
