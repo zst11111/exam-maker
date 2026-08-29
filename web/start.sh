@@ -15,10 +15,13 @@ else
     exit 1
 fi
 
+# 端口：默认 80（可 PORT=xxxx 覆盖），0.0.0.0 绑定使局域网/公网可访问
+PORT="${PORT:-80}"
+
 echo "使用 Python: $PYTHON"
-echo "启动 exam-maker 服务: http://localhost:2342"
+echo "启动 exam-maker 服务: http://0.0.0.0:${PORT}"
 echo "按 Ctrl+C 停止"
 echo ""
 
 cd "$(dirname "$0")"
-exec "$PYTHON" -m uvicorn app:app --host 0.0.0.0 --port 2342
+exec "$PYTHON" -m uvicorn app:app --host 0.0.0.0 --port "$PORT"

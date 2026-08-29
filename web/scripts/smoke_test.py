@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import db  # 仅引导练习卷：练习卷只能经"已批改提交"链路生成，HTTP 复刻太重
 import auth  # teacher_b 造号用（hash_password 生成 password_hash）
 
-BASE = "http://localhost:2342"
+BASE = os.environ.get("EXAM_BASE", "http://localhost:80")
 TEACHER = {"username": "teacher", "password": "123456"}
 STUDENT = {"username": "20260101", "password": "123456"}
 

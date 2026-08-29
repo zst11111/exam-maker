@@ -863,4 +863,5 @@ async def get_state(session_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=2342, reload=True)
+    port = int(os.environ.get("PORT", "80"))
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)
