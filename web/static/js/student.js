@@ -197,6 +197,9 @@ async function showResult(pid) {
     const photos = p.submission?.photos || {};
     const qs = p.questions || [];
     $('studentResultContent').innerHTML = `
+        <div class="result-toolbar">
+            <button class="btn-small" onclick="backToStudentResults()">← 返回成绩列表</button>
+        </div>
         <div class="paper-card">
             <div class="paper-card-head">
                 <span class="paper-card-title">📄 ${esc(p.title)}</span>
@@ -235,4 +238,10 @@ async function showResult(pid) {
     $('studentResultView').classList.remove('hidden');
     $('tabStudentResult').classList.add('active');
     $('tabStudentPapers').classList.remove('active');
+}
+
+// 从逐题详情返回成绩列表（避免看完没有入口回去）
+function backToStudentResults() {
+    loadStudentResults();
+    window.scrollTo(0, 0);
 }

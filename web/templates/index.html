@@ -438,8 +438,11 @@
         <div class="tab-panel hidden" id="gradeView">
             <button class="btn-small" onclick="backToHome()">← 返回首页</button>
             <h2 id="gradeTitle">批改试卷</h2>
-            <button class="btn-small hidden" id="btnPublishPaper" onclick="publishPaper(_gradePaperId)">📣 发布整卷成绩</button>
-            <div id="gradeList"></div>
+            <button class="btn-small hidden" id="btnPublishPaper" onclick="openPublishModal(_gradePaperId)">📣 发布整卷成绩</button>
+            <div class="grade-layout">
+                <aside class="grade-sidebar" id="gradeSidebar"></aside>
+                <div id="gradeList" class="grade-main"></div>
+            </div>
         </div>
     </div>
 
@@ -486,19 +489,38 @@
     <!-- ══════════════════════════════════════════ -->
     <div id="counselorApp" class="app hidden">
         <nav class="top-tabs">
-            <button class="top-tab" id="tabCounselorAnalytics" onclick="switchCounselorTab('analytics')">📊 学生学情</button>
+            <button class="top-tab" id="tabCounselorAnalytics" onclick="switchCounselorTab('analytics')">📚 学业管理</button>
+            <button class="top-tab" id="tabCounselorDaily" onclick="switchCounselorTab('daily')">📋 日常管理</button>
             <button class="top-tab" id="tabCounselorUsers" onclick="switchCounselorTab('users')">👥 账号管理</button>
         </nav>
 
         <div class="tab-panel" id="counselorAnalyticsView">
-            <h2>📊 学生学情（含考勤 / 请假 / 学业警告）</h2>
+            <h2>📚 学业管理</h2>
+            <p class="hint">按班级查看各考试总览（均分 / 提交人数 / 总人数），点进某场考试看学生成绩</p>
             <div class="bank-filter">
                 <select id="cClass"><option value="">全部班级</option></select>
                 <select id="cMajor"><option value="">全部学科</option></select>
                 <button class="btn-small" onclick="loadCounselorAnalytics()">🔍 筛选</button>
-                <button class="btn-small btn-warn" onclick="autoDetect()">⚡ 自动检测学业警告</button>
             </div>
             <div id="counselorAnalyticsList" class="paper-list"></div>
+            <div id="counselorExamDetail" class="hidden">
+                <button class="btn-small" onclick="backCounselorOverview()">← 返回班级总览</button>
+                <h3 id="counselorExamTitle"></h3>
+                <p class="hint" id="counselorExamMeta"></p>
+                <div id="counselorExamList" class="paper-list"></div>
+            </div>
+        </div>
+
+        <div class="tab-panel hidden" id="counselorDailyView">
+            <h2>📋 日常管理</h2>
+            <p class="hint">旷课 / 请假 / 学业警告的记录与录入</p>
+            <div class="bank-filter">
+                <select id="cDClass"><option value="">全部班级</option></select>
+                <select id="cDMajor"><option value="">全部学科</option></select>
+                <button class="btn-small" onclick="loadCounselorDaily()">🔍 筛选</button>
+                <button class="btn-small btn-warn" onclick="autoDetect()">⚡ 自动检测学业警告</button>
+            </div>
+            <div id="counselorDailyList" class="paper-list"></div>
         </div>
 
         <div class="tab-panel hidden" id="counselorUsersView">
@@ -568,6 +590,26 @@
             <div class="modal-actions">
                 <button class="btn-small" onclick="closePractice()">取消</button>
                 <button class="btn-primary modal-save" id="btnPracticeSave">✅ 生成练习卷并分发</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 发布整卷成绩 弹窗（已发布成绩一览 + 发布） -->
+    <div class="modal hidden" id="publishModal">
+        <div class="modal-backdrop" onclick="closePublishModal()"></div>
+        <div class="modal-card publish-card">
+            <h3 id="publishTitle">发布整卷成绩</h3>
+            <p class="hint" id="publishHint"></p>
+            <div id="publishStatus" style="margin-bottom:10px"></div>
+            <div class="publish-table-wrap">
+                <table class="publish-table">
+                    <thead><tr><th>学生</th><th>学号</th><th>班级</th><th>状态</th><th>得分</th></tr></thead>
+                    <tbody id="publishTableBody"></tbody>
+                </table>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-small" onclick="closePublishModal()">关闭</button>
+                <button class="btn-primary modal-save" id="btnPublishConfirm" onclick="confirmPublish(_pubPaperId)">📣 发布整卷成绩</button>
             </div>
         </div>
     </div>

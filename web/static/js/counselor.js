@@ -1,31 +1,125 @@
-// 辅导员端：学生学情（含考勤/请假/警告）、账号管理（学生/教师）
+// 辅导员端：学业管理（考试）/ 日常管理（旷课请假）/ 账号管理（学生/教师）
 let _cStudents = [];
 let _allUsers = [];
+let _counselorPapers = [];   // 学业管理：考试总览（来自 /api/counselor/exam-overview）
+let _counselorExam = null;   // 当前展开的考试详情
+
+function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
 
 function switchCounselorTab(tab) {
     $('tabCounselorAnalytics').classList.toggle('active', tab === 'analytics');
+    $('tabCounselorDaily').classList.toggle('active', tab === 'daily');
     $('tabCounselorUsers').classList.toggle('active', tab === 'users');
     $('counselorAnalyticsView').classList.toggle('hidden', tab !== 'analytics');
+    $('counselorDailyView').classList.toggle('hidden', tab !== 'daily');
     $('counselorUsersView').classList.toggle('hidden', tab !== 'users');
     if (tab === 'analytics') loadCounselorAnalytics();
+    else if (tab === 'daily') loadCounselorDaily();
     else loadCounselorUsers();
 }
 
 // ═══════════════════════════════════════════════════════════
-// 学生学情
+// 学业管理：按班级 → 考试列表（均分/提交人数/总人数）→ 点进某场考试看学生成绩
 // ═══════════════════════════════════════════════════════════
 async function loadCounselorAnalytics() {
-    const d = await authedJson('/api/analytics');
-    _cStudents = d.students || [];
-    fillOptions('cClass', _cStudents.map(s => s.class_name));
-    fillOptions('cMajor', _cStudents.map(s => s.major));
+    const d = await authedJson('/api/counselor/exam-overview');
+    _counselorPapers = d.papers || [];
+    const opts = [];
+    _counselorPapers.forEach(p => (p.classes || []).forEach(c => {
+        opts.push(c.class_name, c.major);
+    }));
+    fillOptions('cClass', opts);
+    fillOptions('cMajor', opts);
     renderCounselorAnalytics();
 }
 
 function renderCounselorAnalytics() {
     const cls = $('cClass').value, major = $('cMajor').value;
+    const classMap = {};
+    _counselorPapers.forEach(p => (p.classes || []).forEach(c => {
+        if ((cls && c.class_name !== cls) || (major && c.major !== major)) return;
+        const key = (c.class_name || '未分班') + '|' + (c.major || '');
+        if (!classMap[key]) classMap[key] = { name: c.class_name || '未分班', major: c.major || '', exams: [] };
+        classMap[key].exams.push({ paper: p, agg: c });
+    }));
+    const keys = Object.keys(classMap).sort();
+    $('counselorAnalyticsList').innerHTML = keys.length ? keys.map(k => {
+        const cc = classMap[k];
+        return `
+        <div class="paper-card class-card">
+            <div class="paper-card-head">
+                <span class="paper-card-title">🏫 ${esc(cc.name)}${cc.major ? ' · ' + esc(cc.major) : ''}</span>
+                <span class="tag">${cc.exams.length} 场考试</span>
+            </div>
+            <div class="class-section">
+                <div class="class-subhead">📊 考试总览（点击进入查看本场考试详情）</div>
+                <div class="class-exam-list">
+                    ${cc.exams.map(({ paper, agg }) => `
+                        <div class="class-exam-row clickable"
+                             data-pid="${paper.paper_id}" data-class="${escAttr(cc.name)}" data-major="${escAttr(cc.major || '')}">
+                            <span class="class-exam-title">📄 ${esc(paper.title)}</span>
+                            <span class="class-exam-avg">均分 <strong>${agg.avg ?? '—'}</strong>${paper.total_score ? ' / ' + paper.total_score : ''}</span>
+                            <span class="hint">提交 ${agg.submitted}/${agg.total} 人</span>
+                            <span class="tag ${paper.published ? 'pub-yes' : 'pub-no'}">${paper.published ? '已发布' : '未发布'}</span>
+                        </div>`).join('')}
+                </div>
+            </div>
+        </div>`;
+    }).join('') : '<p class="empty-row">暂无考试数据（老师尚未分发试卷）</p>';
+}
+
+$('counselorAnalyticsList').addEventListener('click', e => {
+    const row = e.target.closest('.class-exam-row');
+    if (!row) return;
+    openCounselorExam(parseInt(row.dataset.pid, 10), row.dataset.class || '', row.dataset.major || '');
+});
+
+async function openCounselorExam(pid, className, major) {
+    _counselorExam = { pid, className, major };
+    const d = await authedJson(`/api/analytics?paper_id=${pid}`);
+    const rows = (d.students || []).filter(s =>
+        (!className || s.class_name === className) && (!major || s.major === major));
+    const paper = _counselorPapers.find(p => p.paper_id === pid);
+    const graded = rows.filter(r => r.paper_status === 'graded').length;
+    const submitted = rows.filter(r => r.paper_status === 'submitted').length;
+    $('counselorExamTitle').textContent =
+        `📄 ${paper ? paper.title : '考试详情'}${paper && paper.subject ? '（' + paper.subject + '）' : ''}`;
+    $('counselorExamMeta').textContent =
+        `${className || '全部班级'} · 共 ${rows.length} 人 · 已批改 ${graded} · 已提交 ${submitted} · 未作答 ${rows.length - graded - submitted}`;
+    $('counselorExamList').innerHTML = rows.length ? rows.map(r => `
+        <div class="student-row">
+            <span>🧑‍🎓 ${esc(r.name)}</span>
+            <span class="hint">${esc(r.student_no || '')}</span>
+            <span class="tag">${esc(r.class_name || '')}</span>
+            <span class="tag status-${esc(r.paper_status)}">${paperStateLabel(r.paper_status)}</span>
+            <span class="score-big" style="margin-left:auto">${r.paper_status === 'graded' ? (r.paper_score ?? '—') : '—'}</span>
+        </div>`).join('') : '<p class="empty-row">该班无人被分发本场考试</p>';
+    $('counselorAnalyticsList').classList.add('hidden');
+    $('counselorExamDetail').classList.remove('hidden');
+}
+
+function backCounselorOverview() {
+    $('counselorExamDetail').classList.add('hidden');
+    $('counselorAnalyticsList').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════
+// 日常管理：旷课 / 请假 / 学业警告（含录入与自动检测）
+// ═══════════════════════════════════════════════════════════
+async function loadCounselorDaily() {
+    const d = await authedJson('/api/analytics');
+    _cStudents = d.students || [];
+    fillOptions('cDClass', _cStudents.map(s => s.class_name));
+    fillOptions('cDMajor', _cStudents.map(s => s.major));
+    renderCounselorDaily();
+}
+
+function renderCounselorDaily() {
+    const cls = $('cDClass').value, major = $('cDMajor').value;
     const list = _cStudents.filter(s => (!cls || s.class_name === cls) && (!major || s.major === major));
-    $('counselorAnalyticsList').innerHTML = list.length ? list.map(s => `
+    $('counselorDailyList').innerHTML = list.length ? list.map(s => `
         <div class="paper-card">
             <div class="paper-card-head">
                 <span class="paper-card-title">🧑‍🎓 ${esc(s.name)}</span>
@@ -34,11 +128,10 @@ function renderCounselorAnalytics() {
                 <span class="hint">${esc(s.student_no)}</span>
             </div>
             <div class="paper-card-stats">
-                <span>提交 ${s.submitted_count || 0}</span>
-                <span>均分 ${s.avg_score ?? '—'}</span>
                 <span>🏫 旷课 ${s.attendance_count || 0}</span>
                 <span>🌴 请假 ${s.leave_count || 0}</span>
-                <span class="${s.warning_count ? 'bad' : ''}">⚠️ 警告 ${s.warning_count || 0}</span>
+                <span class="${s.warning_count ? 'bad' : ''}">⚠️ 学业警告 ${s.warning_count || 0}</span>
+                <span>均分 ${s.avg_score ?? '—'}</span>
             </div>
             <div class="paper-card-actions">
                 <button class="btn-small" onclick="openRecords(${s.id})">📋 查看 / 记录考勤请假</button>
@@ -51,11 +144,13 @@ async function autoDetect() {
     const created = d.created || [];
     if (!created.length) alert('没有检测到需要新增的学业警告');
     else alert('已自动生成 ' + created.length + ' 条学业警告：\n' + created.map(c => '· ' + c.student + '：' + c.reason).join('\n'));
-    loadCounselorAnalytics();
+    loadCounselorDaily();
 }
 
 $('cClass').addEventListener('change', renderCounselorAnalytics);
 $('cMajor').addEventListener('change', renderCounselorAnalytics);
+$('cDClass').addEventListener('change', renderCounselorDaily);
+$('cDMajor').addEventListener('change', renderCounselorDaily);
 
 // ═══════════════════════════════════════════════════════════
 // 学生记录（旷课 / 请假 / 警告）

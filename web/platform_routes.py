@@ -570,7 +570,7 @@ async def analytics(class_name: str = "", major: str = "", paper_id: int = 0, re
         st["last_score"] = scores[0] if scores else None
         st["submissions"] = [
             {"id": s["id"], "paper_id": s["paper_id"], "title": s["title"], "subject": s["subject"],
-             "status": s["status"], "total_score": s["total_score"],
+             "status": s["status"], "total_score": s["total_score"], "paper_total": s["paper_total"],
              "ai_feedback": _json_loads(s["ai_feedback_json"], []), "submitted_at": s["submitted_at"]}
             for s in subs
         ]
@@ -579,6 +579,41 @@ async def analytics(class_name: str = "", major: str = "", paper_id: int = 0, re
         st["leave_count"] = db.count_leave(st["id"])
         st["warning_count"] = db.count_warnings(st["id"])
     return {"students": students}
+
+
+@router.get("/counselor/exam-overview")
+async def counselor_exam_overview(request: Request):
+    """辅导员学业管理：全部正式考试按班级聚合（均分 / 提交人数 / 总人数）。"""
+    auth.require_role(request, "counselor")
+    out = []
+    for p in db.list_all_papers():
+        if p.get("is_practice"):
+            continue
+        dists = db.list_distributions(p["id"])
+        if not dists:
+            continue
+        groups: Dict[str, List] = {}
+        for d in dists:
+            key = (d.get("class_name") or "未分班", d.get("major") or "")
+            groups.setdefault(key, []).append(d)
+        classes = []
+        for (cn, mj), rows in groups.items():
+            scores = [r["total_score"] for r in rows
+                      if r["status"] == "graded" and r["total_score"] is not None]
+            classes.append({
+                "class_name": cn,
+                "major": mj,
+                "total": len(rows),
+                "submitted": sum(1 for r in rows if r["status"]),
+                "graded": sum(1 for r in rows if r["status"] == "graded"),
+                "avg": round(sum(scores) / len(scores), 1) if scores else None,
+            })
+        out.append({
+            "paper_id": p["id"], "title": p["title"], "subject": p["subject"],
+            "total_score": p["total_score"], "published": bool(p.get("published")),
+            "classes": classes,
+        })
+    return {"papers": out}
 
 
 # ═══════════════════════════════════════════════════════════

@@ -1,11 +1,16 @@
-// 教师批改页：提交列表 + AI 批改 + 逐题改分/评语 + 总评 + 发布成绩 + 按错题推题
+// 教师批改页：提交列表 + 左侧进度窗格（已批改/未批改）+ AI 批改 + 逐题改分/评语 + 总评 + 发布成绩 + 按错题推题
 let _gradePaperId = null, _gradePaper = null, _gradeQuestions = [], _gradeSubs = [], _feedbacks = {}, _summaries = {};
+let _gradeDistributions = [], _gradeFilter = 'all'; // all | graded | submitted | none
 
 async function openGrade(pid, focusSid) {
     _gradePaperId = pid;
-    const d = await authedJson(`/api/papers/${pid}/submissions`);
+    const [d, dist] = await Promise.all([
+        authedJson(`/api/papers/${pid}/submissions`),
+        authedJson(`/api/papers/${pid}/distributions`),
+    ]);
     _gradeQuestions = d.questions || [];
     _gradeSubs = d.submissions || [];
+    _gradeDistributions = dist.distributions || [];
     _feedbacks = {};
     _summaries = {};
     _gradeSubs.forEach(s => {
@@ -22,15 +27,83 @@ async function openGrade(pid, focusSid) {
     _gradePaperId = pid;
     _gradePaper = paper;
     const btnPub = $('btnPublishPaper');
-    if (btnPub) btnPub.classList.toggle('hidden', !!paper.is_practice || !!paper.published);
+    if (btnPub) {
+        btnPub.classList.toggle('hidden', !!paper.is_practice);
+        btnPub.textContent = paper.published ? '📋 查看整卷成绩' : '📣 发布整卷成绩';
+    }
+    renderGradeSidebar();
     renderGradeList();
     if (focusSid) focusStudentCard(focusSid);
 }
 
+// ── 左侧进度窗格：已批改 / 未批改（待批）/ 未提交 计数 + 快速跳转，不用一直往下翻 ──
+const _GRADE_SB_TABS = [
+    { key: 'all', label: '全部' },
+    { key: 'submitted', label: '未批改' },
+    { key: 'graded', label: '已批改' },
+    { key: 'none', label: '未提交' },
+];
+
+function _gradeStatusLabel(st) {
+    if (st === 'graded') return '已批改';
+    if (st === 'submitted') return '待批改';
+    return '未提交';
+}
+
+function renderGradeSidebar() {
+    const ro = _gradeDistributions || [];
+    const counts = {
+        all: ro.length,
+        graded: ro.filter(d => d.status === 'graded').length,
+        submitted: ro.filter(d => d.status === 'submitted').length,
+        none: ro.filter(d => d.status == null).length,
+    };
+    const filtered = ro.filter(d => {
+        if (_gradeFilter === 'all') return true;
+        if (_gradeFilter === 'none') return d.status == null;
+        return d.status === _gradeFilter;
+    });
+    $('gradeSidebar').innerHTML = `
+        <div class="grade-sidebar-head">批改进度</div>
+        <div class="grade-sidebar-chips">
+            ${_GRADE_SB_TABS.map(t => `
+                <button class="sb-chip ${_gradeFilter === t.key ? 'active' : ''}" onclick="setGradeFilter('${t.key}')">${t.label} ${counts[t.key]}</button>`).join('')}
+        </div>
+        <div class="grade-sidebar-list">
+            ${filtered.length ? filtered.map(d => `
+                <div class="grade-sb-row ${d.sub_id == null ? 'muted' : ''}"
+                     onclick="gradeSidebarJump(${d.sub_id == null ? 'null' : d.sub_id}, ${d.sub_id == null ? 'false' : 'true'})"
+                     title="${_gradeStatusLabel(d.status)}${d.status === 'graded' ? ' · 得分 ' + d.total_score : ''}">
+                    <span class="grade-sb-name">${esc(d.name)}</span>
+                    <span class="tag status-${esc(d.status || 'none')}">${_gradeStatusLabel(d.status)}</span>
+                    ${d.status === 'graded' ? `<span class="grade-sb-score">${d.total_score ?? '—'}</span>` : ''}
+                </div>`).join('')
+            : '<span class="hint">该状态下暂无学生</span>'}
+        </div>`;
+}
+
+function setGradeFilter(key) {
+    _gradeFilter = key;
+    renderGradeSidebar();
+    renderGradeList();
+}
+
+function gradeSidebarJump(sid, hasSub) {
+    if (!hasSub) { alert('该生尚未作答，无可批改内容'); return; }
+    focusStudentCard(sid);
+}
+
 function renderGradeList() {
-    $('gradeList').innerHTML = _gradeSubs.length
-        ? _gradeSubs.map(s => gradeCard(s)).join('')
-        : '<p class="empty-row">暂无学生提交（先「分发」试卷给学生）</p>';
+    const list = _gradeSubs.filter(s => {
+        if (_gradeFilter === 'all') return true;
+        if (_gradeFilter === 'none') return false;
+        return s.status === _gradeFilter;
+    });
+    $('gradeList').innerHTML = list.length
+        ? list.map(s => gradeCard(s)).join('')
+        : (_gradeFilter === 'none'
+            ? '<p class="empty-row">暂无未提交学生</p>'
+            : '<p class="empty-row">暂无学生提交（先「分发」试卷给学生）</p>');
 }
 
 function focusStudentCard(sid) {
@@ -202,3 +275,70 @@ $('btnPracticeSave').addEventListener('click', async () => {
         alert('生成失败：' + (e && e.message ? e.message : e));
     }
 });
+
+// ═══════════════════════════════════════════════════════════
+// 发布整卷成绩：已发布所有学生成绩一览，避免重复发布
+// ═══════════════════════════════════════════════════════════
+let _pubPaperId = null, _pubPaper = null, _pubDists = [];
+
+async function openPublishModal(pid) {
+    _pubPaperId = pid;
+    try {
+        const [paper, dist] = await Promise.all([
+            authedJson(`/api/papers/${pid}`),
+            authedJson(`/api/papers/${pid}/distributions`),
+        ]);
+        _pubPaper = paper;
+        _pubDists = dist.distributions || [];
+    } catch (e) {
+        alert('加载成绩失败：' + (e && e.message ? e.message : e));
+        return;
+    }
+    renderPublishModal();
+    $('publishModal').classList.remove('hidden');
+}
+
+function renderPublishModal() {
+    const p = _pubPaper || {};
+    const dists = _pubDists || [];
+    const graded = dists.filter(d => d.status === 'graded').length;
+    const submitted = dists.filter(d => d.status === 'submitted').length;
+    const none = dists.length - graded - submitted;
+    $('publishTitle').textContent = '发布整卷成绩：' + (p.title || '');
+    $('publishHint').textContent = `共分发 ${dists.length} 人 · 已批改 ${graded} · 待批改 ${submitted} · 未提交 ${none}`;
+    $('publishStatus').innerHTML = p.published
+        ? `<span class="tag pub-yes">✅ 成绩已发布${p.published_at ? '（' + esc(String(p.published_at).slice(0, 16)) + '）' : ''}</span>`
+        : `<span class="tag pub-no">⏳ 尚未发布（发布后学生端可见所有已批改分数与反馈）</span>`;
+    $('publishTableBody').innerHTML = dists.length ? dists.map(d => `
+        <tr>
+            <td>🧑‍🎓 ${esc(d.name)}</td>
+            <td class="hint">${esc(d.student_no || '')}</td>
+            <td class="hint">${esc(d.class_name || '')}</td>
+            <td><span class="tag status-${esc(d.status || 'none')}">${_gradeStatusLabel(d.status)}</span></td>
+            <td>${d.status === 'graded' ? (d.total_score ?? '—') : '—'}</td>
+        </tr>`).join('') : '<tr><td colspan="5" class="empty-row">该卷尚未分发给任何学生</td></tr>';
+    const btn = $('btnPublishConfirm');
+    if (btn) {
+        btn.classList.toggle('hidden', !!p.published);
+        btn.disabled = graded === 0;
+        btn.title = graded === 0 ? '尚无已批改成绩' : '';
+    }
+}
+
+async function confirmPublish(pid) {
+    const graded = (_pubDists || []).filter(d => d.status === 'graded').length;
+    if (!graded) { alert('尚无已批改成绩可发布'); return; }
+    if (!confirm('确定发布整卷成绩？发布后学生端将可见所有已批改分数与反馈。')) return;
+    await authedJson(`/api/papers/${pid}/publish`, { method: 'POST' });
+    if (_pubPaper) { _pubPaper.published = true; _pubPaper.published_at = new Date().toISOString().slice(0, 19); }
+    renderPublishModal();
+    if (typeof loadExamManage === 'function') await loadExamManage();
+    if (typeof loadHome === 'function') await loadHome();
+    if (typeof refreshMyPapers === 'function') refreshMyPapers();
+    alert('成绩已发布，学生端现在可以查看分数');
+}
+
+function closePublishModal() {
+    $('publishModal').classList.add('hidden');
+    _pubPaperId = null;
+}

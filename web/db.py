@@ -325,6 +325,14 @@ def list_papers(teacher_id: int) -> List[Dict[str, Any]]:
     return [_row_to_dict(r) for r in rows]
 
 
+def list_all_papers() -> List[Dict[str, Any]]:
+    """全部试卷（辅导员学业管理用），不分教师。"""
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM papers ORDER BY id DESC").fetchall()
+    conn.close()
+    return [_row_to_dict(r) for r in rows]
+
+
 def delete_paper(pid: int) -> None:
     conn = get_conn()
     conn.execute("DELETE FROM papers WHERE id = ?", (pid,))
@@ -487,7 +495,7 @@ def finalize_submission(sid: int, feedback: List[Dict], total: float, comment: s
 def list_student_submissions(student_id: int) -> List[Dict[str, Any]]:
     conn = get_conn()
     rows = conn.execute("""
-        SELECT s.*, p.title, p.subject
+        SELECT s.*, p.title, p.subject, p.total_score AS paper_total
         FROM submissions s JOIN papers p ON p.id = s.paper_id
         WHERE s.student_id = ?
         ORDER BY s.id DESC

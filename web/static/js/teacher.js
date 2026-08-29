@@ -330,7 +330,7 @@ function examRow(p) {
         </div>
         <div class="paper-card-actions">
             <button class="btn-small" onclick="event.stopPropagation(); openGrade(${p.id})">✍️ 去批改</button>
-            ${p.is_practice ? '' : (p.published ? '' : `<button class="btn-small btn-primary-inline" onclick="event.stopPropagation(); publishPaper(${p.id})">📣 发布成绩</button>`)}
+            ${p.is_practice ? '' : `<button class="btn-small ${p.published ? '' : 'btn-primary-inline'}" onclick="event.stopPropagation(); openPublishModal(${p.id})">${p.published ? '📋 已发布 · 查看成绩' : '📣 发布成绩'}</button>`}
         </div>
     </div>`;
 }
@@ -345,14 +345,7 @@ function toggleExamDetail(pid) {
     if (arrow) arrow.textContent = opening ? '▴ 收起' : '▾ 点击查看详情';
 }
 
-async function publishPaper(pid) {
-    if (!confirm('确定发布整卷成绩？发布后学生端将可见所有已批改分数与反馈。')) return;
-    await authedJson(`/api/papers/${pid}/publish`, { method: 'POST' });
-    alert('成绩已发布，学生端现在可以查看分数');
-    await loadExamManage();
-    await loadHome();
-    refreshMyPapers();
-}
+async function publishPaper(pid) { openPublishModal(pid); }
 
 // ── 改名/备注弹窗 ──
 let _paperMetaMode = 'edit', _paperMetaId = null;

@@ -560,3 +560,51 @@ input[type="date"]:focus { outline: none; border-color: var(--primary); box-shad
 .histogram-title{min-width:120px;font-size:13px;color:var(--text,#1e293b);flex-shrink:0}
 .histogram-note{font-size:12px;color:var(--text-muted,#64748b)}
 .histogram-row .bp-svg{flex:1;min-width:0}
+
+/* v4.2：批改页左侧进度窗格 */
+.grade-layout{display:flex;gap:16px;align-items:flex-start}
+.grade-sidebar{width:230px;flex-shrink:0;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:14px;padding:12px;position:sticky;top:16px;max-height:calc(100vh - 60px);overflow:auto}
+.grade-sidebar-head{font-weight:600;font-size:.9rem;margin-bottom:8px;color:var(--text,#1e293b)}
+.grade-sidebar-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.sb-chip{padding:4px 10px;border:1px solid var(--border,#e2e8f0);border-radius:8px;background:transparent;color:var(--text-muted,#64748b);cursor:pointer;font-size:12px;transition:all .15s}
+.sb-chip:hover{border-color:#2563eb;color:#2563eb}
+.sb-chip.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.grade-sidebar-list{display:flex;flex-direction:column;gap:4px}
+.grade-sb-row{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:.82rem;transition:background .12s}
+.grade-sb-row:hover{background:#eef2ff}
+.grade-sb-row.muted{opacity:.5;cursor:default}
+.grade-sb-row.muted:hover{background:transparent}
+.grade-sb-name{flex-shrink:0;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grade-sb-score{margin-left:auto;font-weight:700;color:#2563eb;font-size:.8rem}
+.grade-main{flex:1;min-width:0}
+@media (max-width:720px){.grade-layout{flex-direction:column}.grade-sidebar{width:100%;position:static;max-height:none}}
+
+/* v4.2：发布整卷成绩弹窗（成绩一览表） */
+.publish-card{max-width:680px}
+.publish-table-wrap{max-height:50vh;overflow:auto;border:1px solid var(--border,#e2e8f0);border-radius:10px;margin-top:8px}
+.publish-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.publish-table th,.publish-table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border,#e2e8f0);white-space:nowrap}
+.publish-table th{background:#f8f9ff;position:sticky;top:0;font-weight:600;color:var(--text-muted,#64748b)}
+.publish-table tr:hover td{background:#f8fafc}
+.publish-table .empty-row{text-align:center;padding:20px}
+
+/* v4.2：学生端成绩详情返回按钮 */
+.result-toolbar{display:flex;margin-bottom:12px}
+.result-toolbar .btn-small{background:transparent;border-color:var(--border,#e2e8f0)}
+
+/* v4.2：辅导员学情按班级大卡（圆环 + 考试分数总览 + 名单） */
+.class-card .exam-stats-grid{grid-template-columns:repeat(4,minmax(64px,1fr)) auto}
+.class-section{margin-top:14px;padding-top:12px;border-top:1px dashed var(--border,#e2e8f0)}
+.class-subhead{font-weight:600;font-size:.85rem;margin-bottom:8px;color:var(--text-muted,#64748b)}
+.class-exam-row{display:flex;align-items:center;gap:10px;font-size:.82rem;padding:5px 0;flex-wrap:wrap}
+.class-exam-row.clickable{cursor:pointer;border-radius:8px;padding:7px 8px;transition:background .12s}
+.class-exam-row.clickable:hover{background:#eef2ff}
+.class-exam-title{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.class-exam-avg{white-space:nowrap}
+.class-exam-avg strong{color:#2563eb}
+.class-exam-bar{flex:1;min-width:120px;height:6px;background:#eef2f7;border-radius:4px;overflow:hidden}
+.class-exam-fill{height:100%;background:linear-gradient(90deg,#60a5fa,#2563eb);border-radius:4px}
+.class-roster{display:flex;flex-direction:column;gap:2px}
+.class-roster .student-row{padding:5px 8px}
+.class-roster .student-row:hover{background:#eef2ff}
+@media (max-width:720px){.class-card .exam-stats-grid{grid-template-columns:repeat(2,1fr)}.class-card .exam-donuts{grid-column:1/-1;justify-content:center}}
