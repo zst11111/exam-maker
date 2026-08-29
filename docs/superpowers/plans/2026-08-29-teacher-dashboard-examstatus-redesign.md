@@ -242,7 +242,7 @@ from html.parser import HTMLParser
 class P(HTMLParser):
     def __init__(self): super().__init__(); self.ids=[]
     def handle_starttag(self, t, a):
-        if t=='div': self.ids.append(dict(a).get('id'))
+        if t in ('div','button'): self.ids.append(dict(a).get('id'))
 p=P(); p.feed(open('templates/index.html').read())
 for i in ['tabMyPapers','myPapersView','examOverviewList','boxPlotList']:
     assert i in p.ids, f'缺少 {i}'
