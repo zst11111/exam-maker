@@ -142,6 +142,11 @@ def main():
     assert len(scored) == 1, "已批改人数应为 1"
     graded_row = next(d for d in dists if d["status"] == "graded")
     assert graded_row["sub_id"] == subid, "distributions.sub_id 应与 submissions.id 一致（批改卡 id 契约）"
+    # submitted（已提交未批改）：练习卷 prac 已提交未批改，sub_id 非空、total_score 为 None
+    p3p = next(x for x in pl3 if x["id"] == prac)
+    sub_rows = [d for d in p3p["distributions"] if d["status"] == "submitted"]
+    assert sub_rows, "练习卷应存在 status=='submitted'（已提交未批改）行"
+    assert all(d["sub_id"] is not None and d["total_score"] is None for d in sub_rows), "submitted 行契约不符"
 
     # 清理 teacher_b
     db.delete_user(tb_id)
