@@ -49,18 +49,26 @@
     <div id="teacherApp" class="app hidden">
         <nav class="top-tabs">
             <button class="top-tab" id="tabHome" onclick="switchTeacherTab('home')">🏠 首页</button>
+            <button class="top-tab" id="tabExam" onclick="switchTeacherTab('exam')">🏫 考试管理</button>
+            <button class="top-tab" id="tabMyPapers" onclick="switchTeacherTab('mypapers')">📚 我的试卷</button>
             <button class="top-tab" id="tabWizard" onclick="switchTeacherTab('wizard')">📝 出试卷</button>
             <button class="top-tab" id="tabBank" onclick="switchTeacherTab('bank')">🗂️ 题库管理</button>
             <button class="top-tab" id="tabAnalytics" onclick="switchTeacherTab('analytics')">📊 学生学情</button>
-            <button class="top-tab" id="tabExam" onclick="switchTeacherTab('exam')">🏫 考试管理</button>
         </nav>
 
-        <!-- 首页：统计卡 + 我的试卷 -->
+        <!-- 首页：考情总览（只读） -->
         <div class="tab-panel" id="teacherHome">
+            <div class="section-head"><h2>考情总览</h2></div>
             <div class="stat-cards" id="statCards"></div>
-            <div class="section-head">
-                <h2>我的试卷</h2>
-            </div>
+            <div class="section-head"><h2>考试考情</h2></div>
+            <div id="examOverviewList" class="paper-list"></div>
+            <div class="section-head"><h2>学生成绩箱线图</h2></div>
+            <div id="boxPlotList" class="paper-list"></div>
+        </div>
+
+        <!-- 我的试卷：独立卷库 -->
+        <div class="tab-panel hidden" id="myPapersView">
+            <div class="section-head"><h2>我的试卷</h2></div>
             <div class="papers-tabs">
                 <button class="papers-tab active" id="papersTabFormal" onclick="switchPapersTab('formal')">正式试卷</button>
                 <button class="papers-tab" id="papersTabPractice" onclick="switchPapersTab('practice')">错题推送卷</button>
@@ -411,7 +419,7 @@
 
         <!-- 分发试卷 -->
         <div class="tab-panel hidden" id="distributeView">
-            <button class="btn-small" onclick="backToHome()">← 返回我的试卷</button>
+            <button class="btn-small" onclick="backToHome()">← 返回首页</button>
             <h2 id="distributeTitle">分发试卷</h2>
             <div class="bank-filter">
                 <select id="dClass"><option value="">全部班级</option></select>
@@ -424,7 +432,7 @@
 
         <!-- 批改 -->
         <div class="tab-panel hidden" id="gradeView">
-            <button class="btn-small" onclick="backToHome()">← 返回我的试卷</button>
+            <button class="btn-small" onclick="backToHome()">← 返回首页</button>
             <h2 id="gradeTitle">批改试卷</h2>
             <button class="btn-small hidden" id="btnPublishPaper" onclick="publishPaper(_gradePaperId)">📣 发布整卷成绩</button>
             <div id="gradeList"></div>
@@ -629,6 +637,7 @@
 <script src="/static/js/renderer.js"></script>
 <script src="/static/js/questionbank.js"></script>
 <script src="/static/js/wizard.js"></script>
+<script src="/static/js/charts.js"></script>
 <script src="/static/js/teacher.js"></script>
 <script src="/static/js/student.js"></script>
 <script src="/static/js/grade.js"></script>
