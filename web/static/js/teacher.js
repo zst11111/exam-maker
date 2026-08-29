@@ -23,20 +23,8 @@ let _papersTab = 'formal';
 async function loadHome() {
     const d = await authedJson('/api/papers');
     _papersCache = d.papers || [];
-    const stat = { dist: 0, sub: 0, graded: 0, ongoing: 0 };
-    _papersCache.forEach(p => {
-        stat.dist += p.distributed_count || 0;
-        stat.sub += p.submitted_count || 0;
-        stat.graded += p.graded_count || 0;
-        if (!p.is_practice && (p.distributed_count || 0) > 0 && !p.published) stat.ongoing++;
-    });
-    $('statCards').innerHTML = `
-        <div class="stat-card"><div class="stat-num">${stat.dist}</div><div class="stat-label">总已分发</div></div>
-        <div class="stat-card"><div class="stat-num">${stat.sub}</div><div class="stat-label">总已提交</div></div>
-        <div class="stat-card"><div class="stat-num">${stat.graded}</div><div class="stat-label">总已批改</div></div>
-        <div class="stat-card"><div class="stat-num">${stat.ongoing}</div><div class="stat-label">进行中的考试</div></div>`;
     renderExamOverview();
-    renderBoxPlots();
+    renderScoreHistograms();
 }
 
 async function loadMyPapers() {
@@ -60,10 +48,10 @@ function renderPapersTabs() {
 
 // ── 首页考情列表（只读）──
 function renderExamOverview() {
-    const exams = _papersCache.filter(p => (p.distributed_count || 0) > 0);
+    const exams = _papersCache.filter(p => !p.is_practice && (p.distributed_count || 0) > 0);
     $('examOverviewList').innerHTML = exams.length
         ? exams.map(examOverviewCard).join('')
-        : '<p class="empty-row">暂无已分发的考试（先在「我的试卷」中分发试卷）</p>';
+        : '<p class="empty-row">暂无已分发的正式考试（先在「我的试卷」中分发）</p>';
 }
 
 function examOverviewCard(p) {
@@ -76,10 +64,10 @@ function examOverviewCard(p) {
         <div class="paper-card-head">
             <span class="paper-card-title">📄 ${esc(p.title)}</span>
             <span class="tag">${esc(p.subject || '未指定学科')}</span>
-            ${p.is_practice ? '<span class="tag">🏷️ 练习</span>' : ''}
             <span class="tag">${p.question_count} 题 / 总分 ${p.total_score ?? 0}</span>
             ${p.is_practice ? '' : `<span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>`}
         </div>
+        <div class="paper-card-meta">分发时间：${p.first_distributed_at ? esc(p.first_distributed_at.slice(0, 16)) : '未分发'}</div>
         <div class="exam-stats-grid">
             <div class="exam-stat"><div class="stat-num-lg ok">${sub}</div><div class="stat-label">已提交</div></div>
             <div class="exam-stat"><div class="stat-num-lg warn">${unsub}</div><div class="stat-label">未提交</div></div>
@@ -93,30 +81,30 @@ function examOverviewCard(p) {
     </div>`;
 }
 
-// ── 首页箱线图区（每卷一张，≥5 个已批改分数才绘制）──
-function renderBoxPlots() {
+// ── 首页成绩分布（每卷一张直方图，仅正式考试）──
+function renderScoreHistograms() {
     const rows = [];
     _papersCache.forEach(p => {
+        if (p.is_practice || (p.distributed_count || 0) === 0) return;
         const scores = (p.distributions || [])
             .filter(d => d.status === 'graded')
             .map(d => Number(d.total_score))
             .filter(Number.isFinite);
-        if ((p.distributed_count || 0) === 0) return;
-        if (scores.length < 5) {
-            rows.push(`<div class="boxplot-row">
-                <span class="boxplot-title">📄 ${esc(p.title)}</span>
-                <span class="boxplot-note">数据不足，已批改 ${scores.length} 人（≥5 人才绘制箱线图）</span>
+        if (!scores.length) {
+            rows.push(`<div class="histogram-row">
+                <span class="histogram-title">📄 ${esc(p.title)}</span>
+                <span class="histogram-note">暂无已批改成绩</span>
             </div>`);
             return;
         }
-        rows.push(`<div class="boxplot-row">
-            <span class="boxplot-title">📄 ${esc(p.title)}</span>
-            ${svgBoxPlot(scores, { max: p.total_score || 100 })}
+        rows.push(`<div class="histogram-row">
+            <span class="histogram-title">📄 ${esc(p.title)}</span>
+            ${svgHistogram(scores, { max: p.total_score || 100, bins: 5 })}
         </div>`);
     });
     $('boxPlotList').innerHTML = rows.length
         ? rows.join('')
-        : '<p class="empty-row">暂无已批改数据，无法绘制箱线图</p>';
+        : '<p class="empty-row">暂无已批改成绩</p>';
 }
 
 function switchPapersTab(tab) {
@@ -265,13 +253,32 @@ function renderGradeOverview() {
 }
 
 // ── 考试管理 ──
+let _examSubTab = 'formal'; // formal | wrong | homework
+
+function matchExamSubTab(p) {
+    if (_examSubTab === 'formal') return !p.is_practice;
+    if (_examSubTab === 'wrong') return !!p.is_wrong_push;
+    return p.is_practice && !p.is_wrong_push; // homework
+}
+
+function switchExamSubTab(name) {
+    _examSubTab = name;
+    const map = { formal: 'examSubFormal', wrong: 'examSubWrong', homework: 'examSubHomework' };
+    Object.entries(map).forEach(([k, id]) => { const el = $(id); if (el) el.classList.toggle('active', k === name); });
+    renderExamManageList();
+}
+
 async function loadExamManage() {
     const d = await authedJson('/api/papers');
     _papersCache = d.papers || [];
-    const exams = _papersCache.filter(p => (p.distributed_count || 0) > 0);
-    $('examManageList').innerHTML = exams.length
-        ? exams.map(examRow).join('')
-        : '<p class="empty-row">暂无已分发的正式考试</p>';
+    renderExamManageList();
+}
+
+function renderExamManageList() {
+    const list = _papersCache.filter(p => (p.distributed_count || 0) > 0 && matchExamSubTab(p));
+    $('examManageList').innerHTML = list.length
+        ? list.map(examRow).join('')
+        : '<p class="empty-row">该分类下暂无已分发的试卷</p>';
 }
 
 function examRow(p) {
@@ -284,7 +291,7 @@ function examRow(p) {
         <div class="paper-card-head">
             <span class="paper-card-title">📄 ${esc(p.title)}</span>
             <span class="tag">${esc(p.subject || '未指定学科')}</span>
-            ${p.is_practice ? '<span class="tag">🏷️ 练习</span>' : ''}
+            ${p.is_wrong_push ? '<span class="tag">🎯 错题练习</span>' : (p.is_practice ? '<span class="tag">📚 日常作业</span>' : '')}
             <span class="tag">${p.question_count} 题 / 总分 ${p.total_score ?? 0}</span>
             ${p.is_practice ? '' : `<span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>`}
             <span class="hint" style="margin-left:auto" id="examArrow_${p.id}">▾ 点击查看详情</span>

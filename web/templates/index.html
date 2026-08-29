@@ -59,10 +59,9 @@
         <!-- 首页：考情总览（只读） -->
         <div class="tab-panel" id="teacherHome">
             <div class="section-head"><h2>考情总览</h2></div>
-            <div class="stat-cards" id="statCards"></div>
             <div class="section-head"><h2>考试考情</h2></div>
             <div id="examOverviewList" class="paper-list"></div>
-            <div class="section-head"><h2>学生成绩箱线图</h2></div>
+            <div class="section-head"><h2>学生成绩分布</h2></div>
             <div id="boxPlotList" class="paper-list"></div>
         </div>
 
@@ -407,6 +406,11 @@
         <div class="tab-panel hidden" id="examManageView">
             <h2>🏫 考试管理</h2>
             <p class="hint">已分发的正式考试实时跟踪：用的哪套卷、提交/批改进度、成绩发布</p>
+            <div class="exam-subtabs">
+                <button id="examSubFormal" class="exam-subtab active" onclick="switchExamSubTab('formal')">正式考试</button>
+                <button id="examSubWrong" class="exam-subtab" onclick="switchExamSubTab('wrong')">错题练习</button>
+                <button id="examSubHomework" class="exam-subtab" onclick="switchExamSubTab('homework')">日常作业</button>
+            </div>
             <div id="examManageList" class="paper-list"></div>
         </div>
 
