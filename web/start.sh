@@ -2,9 +2,12 @@
 # exam-maker 启动脚本
 # 用法: bash start.sh
 
-# 优先用 conda 环境 exam_env 的 python，否则回退系统 python3
+# python 探测优先级：conda exam_env > 项目内 .venv > 系统 python3
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ -x "/root/miniconda3/envs/exam_env/bin/python" ]; then
     PYTHON="/root/miniconda3/envs/exam_env/bin/python"
+elif [ -x "$SCRIPT_DIR/.venv/bin/python" ]; then
+    PYTHON="$SCRIPT_DIR/.venv/bin/python"
 elif command -v python3 >/dev/null 2>&1; then
     PYTHON="$(command -v python3)"
 else

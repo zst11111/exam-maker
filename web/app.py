@@ -73,7 +73,7 @@ _api_config = _load_api_config()
 
 # ─── 路径配置 ───────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
-SKILL_MD_PATH = BASE_DIR.parent / "SKILL-copy.md"
+SKILL_MD_PATH = BASE_DIR.parent / "SKILL.md"
 ASSETS_DIR = BASE_DIR.parent / "assets"
 SESSIONS_DIR = BASE_DIR / "sessions"
 SESSIONS_DIR.mkdir(exist_ok=True)
