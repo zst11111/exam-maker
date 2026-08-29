@@ -502,7 +502,7 @@ async function publishPaper(pid) {
 
 ```bash
 cd /tmp/blood_cell/exam_maker/智能体大赛/exam-maker/web && node --check static/js/teacher.js && echo "syntax OK"
-grep -c "myPapersView" static/js/teacher.js   # 期望 ≥4（_ALL_VIEWS/switchTeacherTab/openDistribute/elsewhere）
+grep -c "myPapersView" static/js/teacher.js   # 期望 ≥3（_ALL_VIEWS/switchTeacherTab/openDistribute 各 1 处）
 grep -c "renderPapersTabs();" static/js/teacher.js  # 期望 2（loadMyPapers + refreshMyPapers）
 ```
 
@@ -555,8 +555,8 @@ function examRow(p) {
     const subRatio = dist ? sub / dist : 0;
     const gradeRatio = sub ? graded / sub : 0;
     return `
-    <div class="paper-card exam-manage-card">
-        <div class="paper-card-head exam-head" onclick="toggleExamDetail(${p.id})">
+    <div class="paper-card exam-manage-card exam-head" onclick="toggleExamDetail(${p.id})">
+        <div class="paper-card-head">
             <span class="paper-card-title">📄 ${esc(p.title)}</span>
             <span class="tag">${esc(p.subject || '未指定学科')}</span>
             ${p.is_practice ? '<span class="tag">🏷️ 练习</span>' : ''}
@@ -587,7 +587,7 @@ function examRow(p) {
             <div class="exam-students">
                 <div class="exam-students-head">学生名单（${dist} 人）— 点击学生进入该生批改</div>
                 ${(p.distributions || []).map(d => `
-                    <div class="student-row" onclick="openGrade(${p.id}, ${d.student_id})" title="进入该生批改">
+                    <div class="student-row" onclick="event.stopPropagation(); openGrade(${p.id}, ${d.student_id})" title="进入该生批改">
                         <span>🧑‍🎓 ${esc(d.name)}</span>
                         <span class="tag">${esc(d.class_name || '')}</span>
                         <span class="hint">${esc(d.student_no || '')}</span>
@@ -597,13 +597,13 @@ function examRow(p) {
             </div>
         </div>
         <div class="paper-card-actions">
-            <button class="btn-small" onclick="openGrade(${p.id})">✍️ 去批改</button>
-            ${p.is_practice ? '' : (p.published ? '' : `<button class="btn-small btn-primary-inline" onclick="publishPaper(${p.id})">📣 发布成绩</button>`)}
+            <button class="btn-small" onclick="event.stopPropagation(); openGrade(${p.id})">✍️ 去批改</button>
+            ${p.is_practice ? '' : (p.published ? '' : `<button class="btn-small btn-primary-inline" onclick="event.stopPropagation(); publishPaper(${p.id})">📣 发布成绩</button>`)}
         </div>
     </div>`;
 }
 
-// 展开/收起考试详情（整卡点击头部切换）
+// 展开/收起考试详情（整卡点击切换；内层按钮/学生行已 stopPropagation，不会误触）
 function toggleExamDetail(pid) {
     const el = $('examDetail_' + pid);
     const arrow = $('examArrow_' + pid);
