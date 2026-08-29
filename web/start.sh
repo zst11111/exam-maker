@@ -18,10 +18,25 @@ fi
 # 端口：默认 80（可 PORT=xxxx 覆盖），0.0.0.0 绑定使局域网/公网可访问
 PORT="${PORT:-80}"
 
+# 端口：默认 80（可 PORT=xxxx 覆盖），0.0.0.0 绑定使局域网/公网可访问
+PORT="${PORT:-80}"
+
 echo "使用 Python: $PYTHON"
-echo "启动 exam-maker 服务: http://0.0.0.0:${PORT}"
+echo "启动 exam-maker 服务: http://0.0.0.0:${PORT} 和 http://0.0.0.0:2342"
 echo "按 Ctrl+C 停止"
 echo ""
 
 cd "$(dirname "$0")"
-exec "$PYTHON" -m uvicorn app:app --host 0.0.0.0 --port "$PORT"
+
+# 同时监听主端口与历史兼容端口 2342（SLB/负载均衡后端可能指向 2342）
+"$PYTHON" -m uvicorn app:app --host 0.0.0.0 --port "$PORT" &
+PID1=$!
+if [ "$PORT" != "2342" ]; then
+    "$PYTHON" -m uvicorn app:app --host 0.0.0.0 --port 2342 &
+    PID2=$!
+else
+    PID2=""
+fi
+
+trap 'kill $PID1 $PID2 2>/dev/null' INT TERM EXIT
+wait
