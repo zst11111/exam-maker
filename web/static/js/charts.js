@@ -86,3 +86,40 @@ function svgBoxPlot(scores, opts = {}) {
         ${parts.join('')}
     </svg>`;
 }
+
+// 分数段直方图：把 [0,max] 均分 bins 段，柱高 = 段内分数个数，柱顶标人数，底部标分段界点。
+function svgHistogram(scores, opts = {}) {
+    const width = opts.width || 380;
+    const height = opts.height || 160;
+    const max = opts.max ?? 100;
+    const bins = opts.bins || 5;
+    const padL = 40, padR = 10, padT = 14, padB = 26;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+    if (!scores || !scores.length || max <= 0) return '';
+    const counts = new Array(bins).fill(0);
+    scores.forEach(s => { const b = Math.max(0, Math.min(bins - 1, Math.ceil((s / max) * bins) - 1)); counts[b]++; });
+    const peak = Math.max.apply(null, counts) || 1;
+    const barW = plotW / bins;
+    const step = max / bins;
+    const parts = [];
+    for (let i = 0; i < bins; i++) {
+        const h = Math.round((counts[i] / peak) * plotH);
+        const x = padL + i * barW;
+        const y = padT + plotH - h;
+        parts.push(`<rect class="bp-bar" x="${x + 2}" y="${y}" width="${barW - 4}" height="${h}" rx="3"></rect>`);
+        if (counts[i]) parts.push(`<text x="${x + barW / 2}" y="${y - 5}" text-anchor="middle" class="bp-count">${counts[i]}</text>`);
+        parts.push(`<text x="${x + barW / 2}" y="${height - 8}" text-anchor="middle" class="bp-ticklabel">${Math.round(i * step)}</text>`);
+    }
+    parts.push(`<text x="${width - padR}" y="${height - 8}" text-anchor="end" class="bp-ticklabel">${Math.round(max)}</text>`);
+    parts.push(`<line class="bp-axis" x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}"></line>`);
+    return `<svg class="bp-svg" width="100%" height="${height}" viewBox="0 0 ${width} ${height}">
+        <style>
+            .bp-bar{fill:#93c5fd;stroke:#2563eb;stroke-width:1}
+            .bp-count{font-size:11px;fill:#1d4ed8;font-weight:700}
+            .bp-ticklabel{font-size:10px;fill:#94a3b8}
+            .bp-axis{stroke:#94a3b8;stroke-width:1}
+        </style>
+        ${parts.join('')}
+    </svg>`;
+}
