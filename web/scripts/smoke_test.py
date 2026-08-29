@@ -2,8 +2,8 @@
 """exam-maker 教师端改造冒烟测试（stdlib urllib + db 引导，零依赖）。
 
 用法：先启动服务，再：
-  cd /tmp/blood_cell/exam_maker/智能体大赛/exam-maker/web
-  /root/miniconda3/envs/exam_env/bin/python scripts/smoke_test.py
+  cd /root/智能体大赛-exam-maker/web
+  python3 scripts/smoke_test.py
 通过则打印 SMOKE OK；失败抛 AssertionError。
 """
 import json

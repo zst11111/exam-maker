@@ -20,7 +20,7 @@
 - **V41-4** 首页直方图 = 分数段分组柱（5 段均分 [0,total_score]），柱高=段内已批改人数，柱顶标人数。
 - 后端只改 `web/db.py` 与 `web/platform_routes.py`；不得动学生端/辅导员端/学情/出卷/题库路由。
 - `svgBoxPlot` 保留但不被首页使用（防回归，不删）。
-- 环境注记（继承 v3/v4）：git 根 = `/tmp/blood_cell/exam_maker`（工作目录是子目录）；`pkill -f "[u]vicorn app:app"` 方括号技巧必须**单独一条命令**，再**单独** nohup 启动；「Tool permission stream closed」= 通信层抖动，重试或走 Edit。
+- 环境注记（继承 v3/v4）：git 根 = `/root/智能体大赛-exam-maker`；`pkill -f "[u]vicorn app:app"` 方括号技巧必须**单独一条命令**，再**单独** nohup 启动；「Tool permission stream closed」= 通信层抖动，重试或走 Edit。
 - 服务器当前运行中（pid 见 `ps aux|grep "[u]vicorn"`）；后端改动后必须重启 uvicorn 才生效。
 
 ---

@@ -2,14 +2,13 @@
 # exam-maker 启动脚本
 # 用法: bash start.sh
 
-# conda 环境 exam_env 的 python
-PYTHON="/root/miniconda3/envs/exam_env/bin/python"
-
-if [ ! -x "$PYTHON" ]; then
-    echo "错误: 找不到 conda 环境 exam_env 的 Python（$PYTHON）"
-    echo "请先创建并安装依赖："
-    echo "  conda create -n exam_env python=3.11 -y"
-    echo "  conda activate exam_env && pip install -r requirements.txt"
+# 优先用 conda 环境 exam_env 的 python，否则回退系统 python3
+if [ -x "/root/miniconda3/envs/exam_env/bin/python" ]; then
+    PYTHON="/root/miniconda3/envs/exam_env/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON="$(command -v python3)"
+else
+    echo "错误: 找不到 python3"
     exit 1
 fi
 
