@@ -141,14 +141,15 @@ git add web/db.py web/platform_routes.py && git commit -m "feat(backend): papers
 function svgHistogram(scores, opts = {}) {
     const width = opts.width || 380;
     const height = opts.height || 160;
-    const max = opts.max || 100;
+    const max = opts.max ?? 100;   // ?? 使显式 max:0 保持 0（触发空态），不落到 100
     const bins = opts.bins || 5;
     const padL = 40, padR = 10, padT = 14, padB = 26;
     const plotW = width - padL - padR;
     const plotH = height - padT - padB;
     if (!scores || !scores.length || max <= 0) return '';
     const counts = new Array(bins).fill(0);
-    scores.forEach(s => { const b = Math.min(bins - 1, Math.floor((s / max) * bins)); counts[b]++; });
+    // 右闭区间分桶：ceil-1 使 60→[40,60)、80→[60,80)、100→[80,100]（spec 示例 [0,0,1,2,4]）
+    scores.forEach(s => { const b = Math.min(bins - 1, Math.max(0, Math.ceil((s / max) * bins) - 1)); counts[b]++; });
     const peak = Math.max.apply(null, counts) || 1;
     const barW = plotW / bins;
     const step = max / bins;
@@ -187,9 +188,10 @@ cd /tmp/blood_cell/exam_maker/智能体大赛/exam-maker/web && node --check sta
 node -e '
 const fs=require("fs");eval(fs.readFileSync("static/js/charts.js","utf8"));
 const s=svgHistogram([60,70,80,85,90,95,100],{max:100,bins:5});
-// 7 点样本分 5 段：0-20:0 / 20-40:0 / 40-60:1 / 60-80:2 / 80-100:4
+// 7 点样本分 5 段（右闭区间）：0-20:0 / 20-40:0 / 40-60:1 / 60-80:2 / 80-100:4
 if(!s.includes(">4<")||!s.includes(">2<")||!s.includes(">1<")){console.error("count 标签错误");process.exit(1)}
-if(s.includes(">0<")){console.error("空段不应有 count 标签");process.exit(1)}
+// 只认 count 标签：不能用 s.includes(">0<")——bin0 底部刻度标签本身就是 ">0<"（恒真误报）
+if(/class="bp-count">0</.test(s)){console.error("空段不应有 count 标签");process.exit(1)}
 if(svgHistogram([],{max:100})!==""||svgHistogram([50],{max:0})!==""){console.error("空态应返回空串");process.exit(1)}
 console.log("histogram OK");
 '
