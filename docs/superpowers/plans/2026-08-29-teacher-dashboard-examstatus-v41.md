@@ -416,20 +416,27 @@ git add web/static/style.css && git commit -m "style(css): 考试管理3小框 +
 
 - [ ] **Step 2: 新增数据契约断言**
 
-在第 8 步数据契约断言之后追加（直接复用已有 `papers` 响应 `pl` / 各卷对象）：
+在第 8 步数据契约断言（`finally: db.delete_user(sb_id)`）之后追加。**断言必须定位冒烟自建的 `pid`（正式卷）与 `prac`（错题练习卷）两卷**，不能用 `next(x for x in pl if not x["is_practice"])` 类首匹配——种子库可能含未分发正式卷导致 `first_distributed_at` 误判。**未分发契约用确定性构造覆盖（不 fail-open）**：
 
 ```python
     # v4.1: is_wrong_push 分类 + first_distributed_at
-    wrong_p = next(x for x in pl if x.get("is_wrong_push"))
-    assert wrong_p["is_practice"] is True, "错题练习卷必须同时是练习卷"
-    assert wrong_p["first_distributed_at"], "已分发的错题练习卷应有首次分发时间"
-    formal_p = next(x for x in pl if not x["is_practice"])
-    assert formal_p["is_wrong_push"] is False
-    assert formal_p["first_distributed_at"], "已分发的正式卷应有首次分发时间"
-    # 未分发的卷 first_distributed_at 应为 None（若存在）
-    for x in pl:
-        if not x["distributed_count"]:
-            assert x["first_distributed_at"] is None
+    pl4 = req("GET", "/api/papers", t)["papers"]
+    f1 = next(x for x in pl4 if x["id"] == pid)   # 正式卷（已分发）
+    f2 = next(x for x in pl4 if x["id"] == prac)  # 错题练习卷（已分发）
+    assert f1["is_wrong_push"] is False
+    assert f2["is_wrong_push"] is True and f2["is_practice"] is True, "错题练习卷必须同时是练习卷"
+    assert f1["first_distributed_at"], "已分发的正式卷应有首次分发时间"
+    assert f2["first_distributed_at"], "已分发的错题练习卷应有首次分发时间"
+    # 未分发卷 first_distributed_at 应为 None（确定性构造）
+    nd_pid = req("POST", "/api/papers", t, body={
+        "title": "冒烟未分发卷", "subject": "数学", "duration": 120, "total_score": 100,
+        "questions": [{"no": 1, "type": "选择题", "score": 5, "content": "?", "answer": "?"}],
+    })["id"]
+    try:
+        f3 = next(x for x in req("GET", "/api/papers", t)["papers"] if x["id"] == nd_pid)
+        assert f3["first_distributed_at"] is None, "未分发卷应无首次分发时间"
+    finally:
+        req("DELETE", f"/api/papers/{nd_pid}", t)
 ```
 
 - [ ] **Step 3: 运行冒烟**
