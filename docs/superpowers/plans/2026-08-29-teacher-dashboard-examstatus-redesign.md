@@ -530,6 +530,8 @@ git commit -m "feat(teacher): 首页改考情总览（只读+箱线图），我�
   - `examRow(p)` 重写：字段放大 + 圆环 + 整卡点击展开详情
   - `toggleExamDetail(pid)`（内联展开/收起）
 
+**⚠️ 关键取值（Task 3 审查裁定，实现必读）**：`openGrade` 第二参必须是**提交 id**（`submissions.id`），不是学生 id。批改卡片的 `id="grade-card-{s.id}"` 中 `s.id` 是提交 id。学生行传 `d.sub_id`（distributions 里 `s.id AS sub_id`，未作答为 `null`）；`null` 时 `if(focusSid)` 短路 → 不聚焦（无提交本就无批改卡），行为正确。
+
 - [ ] **Step 1: loadExamManage 放宽范围（正式+练习）**
 
 `loadExamManage`（205-212 行）中：
@@ -587,7 +589,7 @@ function examRow(p) {
             <div class="exam-students">
                 <div class="exam-students-head">学生名单（${dist} 人）— 点击学生进入该生批改</div>
                 ${(p.distributions || []).map(d => `
-                    <div class="student-row" onclick="event.stopPropagation(); openGrade(${p.id}, ${d.student_id})" title="进入该生批改">
+                    <div class="student-row" onclick="event.stopPropagation(); openGrade(${p.id}, ${d.sub_id})" title="进入该生批改">
                         <span>🧑‍🎓 ${esc(d.name)}</span>
                         <span class="tag">${esc(d.class_name || '')}</span>
                         <span class="hint">${esc(d.student_no || '')}</span>
