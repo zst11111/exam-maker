@@ -15,6 +15,7 @@ import urllib.request
 # 把 web/ 加进 sys.path（本脚本在 web/scripts/ 下，import db 需要 web/ 在路径上）
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import db  # 仅引导练习卷：练习卷只能经"已批改提交"链路生成，HTTP 复刻太重
+import auth  # teacher_b 造号用（hash_password 生成 password_hash）
 
 BASE = "http://localhost:2342"
 TEACHER = {"username": "teacher", "password": "123456"}
@@ -105,6 +106,45 @@ def main():
         raise AssertionError("练习卷发布应被拒绝")
     except urllib.error.HTTPError as e:
         assert e.code == 400
+
+    # 7) 教师隔离（G2）：teacher_b 看不到 teacher 的卷
+    tb_id = db.create_user({
+        "username": "teacher_b_smoke", "password_hash": auth.hash_password("123456"),
+        "role": "teacher", "name": "老师乙",
+    })
+    tb = login({"username": "teacher_b_smoke", "password": "123456"})
+    plb = req("GET", "/api/papers", tb)["papers"]
+    assert all(x["id"] != pid for x in plb), "teacher_b 不应看到 teacher 的正式卷"
+    assert all(x["id"] != prac for x in plb), "teacher_b 不应看到 teacher 的练习卷"
+    try:
+        req("GET", f"/api/papers/{pid}", tb)
+        raise AssertionError("teacher_b 访问他人正式卷应 404")
+    except urllib.error.HTTPError as e:
+        assert e.code == 404
+
+    # 8) 数据契约（考情/详情/箱线图依赖）：distributions 含状态与得分
+    #    补一个未作答学生，覆盖「未作答行 sub_id 为 None」契约
+    if len(students) >= 2:
+        req("POST", f"/api/papers/{pid}/distribute", t, body={"student_ids": [students[1]["id"]]})
+    pl3 = req("GET", "/api/papers", t)["papers"]
+    p3 = next(x for x in pl3 if x["id"] == pid)
+    dists = p3["distributions"]
+    assert dists, "distributions 应非空"
+    for d in dists:
+        assert d.get("student_id") and d.get("name"), "distributions 行缺 student_id/name"
+        assert "student_no" in d and "class_name" in d and "major" in d, "distributions 行缺字段"
+        assert "sub_id" in d and "status" in d and "total_score" in d, "distributions 行缺状态字段"
+        if d["status"] == "graded":
+            assert d["sub_id"] is not None and d["total_score"] == 5.0, "已批改行 sub_id/score 契约不符"
+        elif d["status"] is None:
+            assert d["sub_id"] is None and d["total_score"] is None, "未作答行 sub_id/score 契约不符"
+    scored = [d["total_score"] for d in dists if d["status"] == "graded"]
+    assert len(scored) == 1, "已批改人数应为 1"
+    graded_row = next(d for d in dists if d["status"] == "graded")
+    assert graded_row["sub_id"] == subid, "distributions.sub_id 应与 submissions.id 一致（批改卡 id 契约）"
+
+    # 清理 teacher_b
+    db.delete_user(tb_id)
 
     # 清理
     req("DELETE", f"/api/papers/{pid}", t)
