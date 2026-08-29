@@ -100,6 +100,7 @@ async def list_papers(request: Request):
             "id": p["id"], "title": p["title"], "subject": p["subject"],
             "duration": p["duration"], "total_score": p["total_score"],
             "created_at": p["created_at"], "is_practice": bool(p.get("is_practice")),
+            "is_wrong_push": bool(p.get("is_wrong_push")),
             "remark": p.get("remark"),
             "published": bool(p.get("published")),
             "published_at": p.get("published_at"),
@@ -108,6 +109,7 @@ async def list_papers(request: Request):
             "submitted_count": len(subs),
             "graded_count": sum(1 for s in subs if s["status"] == "graded"),
             "distributions": dists,
+            "first_distributed_at": min((x.get("distributed_at") for x in dists if x.get("distributed_at")), default=None),
         })
     return {"papers": out}
 
@@ -531,6 +533,7 @@ async def create_practice(sid: int, body: PracticeIn, request: Request):
         "duration": 60, "total_score": total,
         "questions_json": json.dumps(pquestions, ensure_ascii=False),
         "is_practice": 1,
+        "is_wrong_push": 1,
     })
     db.distribute(pid, [sub["student_id"]])
     return {"id": pid, "title": title, "count": len(pquestions), "total_score": total}

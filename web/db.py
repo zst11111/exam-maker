@@ -109,6 +109,10 @@ def init_db() -> None:
         conn.execute("ALTER TABLE papers ADD COLUMN published INTEGER DEFAULT 0")
     if "published_at" not in pcols2:
         conn.execute("ALTER TABLE papers ADD COLUMN published_at TEXT")
+    # 迁移：旧库补 is_wrong_push 列（错题推送标记，幂等）
+    pcols3 = [r["name"] for r in conn.execute("PRAGMA table_info(papers)").fetchall()]
+    if "is_wrong_push" not in pcols3:
+        conn.execute("ALTER TABLE papers ADD COLUMN is_wrong_push INTEGER DEFAULT 0")
     # 辅导员：旷课 / 请假 / 学业警告
     conn.execute("""
         CREATE TABLE IF NOT EXISTS attendance_records (
@@ -290,12 +294,13 @@ def count_students() -> int:
 def create_paper(p: Dict[str, Any]) -> int:
     conn = get_conn()
     cur = conn.execute("""
-        INSERT INTO papers (teacher_id, title, subject, duration, total_score, questions_json, is_practice, remark, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO papers (teacher_id, title, subject, duration, total_score, questions_json, is_practice, is_wrong_push, remark, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         p["teacher_id"], p.get("title", ""), p.get("subject", ""),
         p.get("duration", 120), p.get("total_score", 0),
         p.get("questions_json", "[]"), 1 if p.get("is_practice") else 0,
+        1 if p.get("is_wrong_push") else 0,
         p.get("remark"), _now(),
     ))
     conn.commit()
@@ -386,7 +391,8 @@ def list_distributions(paper_id: int) -> List[Dict[str, Any]]:
     conn = get_conn()
     rows = conn.execute("""
         SELECT u.id AS student_id, u.name, u.student_no, u.class_name, u.major,
-               s.id AS sub_id, s.status, s.total_score, s.submitted_at
+               s.id AS sub_id, s.status, s.total_score, s.submitted_at,
+               d.created_at AS distributed_at
         FROM distributions d
         JOIN users u ON u.id = d.student_id
         LEFT JOIN submissions s ON s.paper_id = d.paper_id AND s.student_id = d.student_id
