@@ -530,3 +530,28 @@ input[type="date"]:focus { outline: none; border-color: var(--primary); box-shad
 
 .textbook-block { margin-top: 16px; padding: 14px 16px; border: 1px dashed #c7cbe0; border-radius: 12px; background: #fbfcfe; }
 .textbook-block .btn-secondary { width: auto; padding: 8px 18px; margin-top: 8px; }
+
+/* ═══════════ 教师端考情管理（v4）═══════════ */
+.exam-head { cursor: pointer; }
+.exam-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(64px, 1fr)) auto; gap: 14px; align-items: center; margin-bottom: 10px; }
+.exam-stat { text-align: center; }
+.stat-num-lg { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+.stat-num-lg.ok { color: #047857; }
+.stat-num-lg.warn { color: #b45309; }
+.exam-donuts { display: flex; gap: 14px; }
+.donut-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.donut-item .stat-label { margin-top: 0; }
+.exam-detail { margin: 4px 0 12px; padding: 14px; background: #f8fafc; border: 1px dashed var(--border); border-radius: 10px; }
+.exam-info-grid { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .82rem; color: var(--text-muted); margin-bottom: 12px; }
+.exam-students-head { font-weight: 600; font-size: .85rem; margin-bottom: 6px; color: var(--text-muted); }
+.student-row { display: flex; align-items: center; gap: 8px; font-size: .85rem; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.student-row:hover { background: #eef2ff; }
+.boxplot-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; flex-wrap: wrap; }
+.boxplot-title { min-width: 180px; font-size: .85rem; font-weight: 600; }
+.boxplot-note { font-size: .8rem; color: var(--text-muted); }
+.boxplot-row .bp-svg { flex: 1; min-width: 280px; }
+.grade-card-focus { outline: 3px solid #3b82f6; outline-offset: 2px; border-radius: 14px; transition: outline-color .2s; }
+@media (max-width: 720px) {
+    .exam-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .exam-donuts { grid-column: 1 / -1; justify-content: center; }
+}
