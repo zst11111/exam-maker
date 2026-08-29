@@ -309,11 +309,6 @@ footer { text-align: center; padding: 16px; font-size: .78rem; color: var(--text
 .tab-panel h2 { font-size: 1.2rem; margin-bottom: 16px; }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 12px; }
 
-/* 统计卡 */
-.stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; text-align: center; box-shadow: var(--shadow-sm); transition: transform .15s, box-shadow .15s; }
-.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-.stat-num { font-size: 1.9rem; font-weight: 800; color: var(--primary); }
 .stat-label { font-size: .8rem; color: var(--text-muted); margin-top: 4px; }
 
 /* 试卷卡片列表 */
@@ -461,7 +456,6 @@ footer { text-align: center; padding: 16px; font-size: .78rem; color: var(--text
     .kp-hint { margin-left: 0; }
     .step5-layout { flex-direction: column; }
     .replace-side { width: 100%; position: static; max-height: none; }
-    .stat-cards { grid-template-columns: repeat(2, 1fr); }
     .answer-layout { flex-direction: column; }
     .answer-sidebar { width: 100%; position: static; }
     .header-inner { flex-direction: column; gap: 10px; align-items: flex-start; }
@@ -555,3 +549,14 @@ input[type="date"]:focus { outline: none; border-color: var(--primary); box-shad
     .exam-stats-grid { grid-template-columns: repeat(2, 1fr); }
     .exam-donuts { grid-column: 1 / -1; justify-content: center; }
 }
+
+/* v4.1：考试管理 3 小框 */
+.exam-subtabs{display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
+.exam-subtab{padding:6px 14px;border:1px solid var(--border,#e2e8f0);border-radius:8px;background:transparent;color:var(--text-muted,#64748b);cursor:pointer;font-size:14px;transition:all .15s}
+.exam-subtab:hover{border-color:#2563eb;color:#2563eb}
+.exam-subtab.active{background:#2563eb;color:#fff;border-color:#2563eb}
+/* v4.1：首页成绩分布直方图 */
+.histogram-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border,#e2e8f0);border-radius:10px;margin-bottom:8px}
+.histogram-title{min-width:120px;font-size:13px;color:var(--text,#1e293b);flex-shrink:0}
+.histogram-note{font-size:12px;color:var(--text-muted,#64748b)}
+.histogram-row .bp-svg{flex:1;min-width:0}
