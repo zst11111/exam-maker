@@ -1,7 +1,7 @@
 // 教师批改页：提交列表 + AI 批改 + 逐题改分/评语 + 总评 + 发布成绩 + 按错题推题
 let _gradePaperId = null, _gradePaper = null, _gradeQuestions = [], _gradeSubs = [], _feedbacks = {}, _summaries = {};
 
-async function openGrade(pid) {
+async function openGrade(pid, focusSid) {
     _gradePaperId = pid;
     const d = await authedJson(`/api/papers/${pid}/submissions`);
     _gradeQuestions = d.questions || [];
@@ -16,7 +16,7 @@ async function openGrade(pid) {
     });
     const paper = await authedJson(`/api/papers/${pid}`);
     $('gradeTitle').textContent = '批改试卷：' + paper.title;
-    ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView', 'examManageView', 'gradeOverviewView']
+    ['teacherHome', 'wizardWrap', 'bankView', 'teacherAnalytics', 'distributeView', 'gradeView', 'examManageView', 'gradeOverviewView', 'myPapersView']
         .forEach(id => { const el = $(id); if (el) el.classList.add('hidden'); });
     $('gradeView').classList.remove('hidden');
     _gradePaperId = pid;
@@ -24,6 +24,7 @@ async function openGrade(pid) {
     const btnPub = $('btnPublishPaper');
     if (btnPub) btnPub.classList.toggle('hidden', !!paper.is_practice || !!paper.published);
     renderGradeList();
+    if (focusSid) focusStudentCard(focusSid);
 }
 
 function renderGradeList() {
@@ -32,13 +33,21 @@ function renderGradeList() {
         : '<p class="empty-row">暂无学生提交（先「分发」试卷给学生）</p>';
 }
 
+function focusStudentCard(sid) {
+    const card = document.getElementById('grade-card-' + sid);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('grade-card-focus');
+    setTimeout(() => card.classList.remove('grade-card-focus'), 2200);
+}
+
 function gradeCard(s) {
     const fb = _feedbacks[s.id] || [];
     const amap = {}; (s.answers || []).forEach(a => amap[a.no] = a);
     const total = fb.reduce((t, f) => t + ((f.score != null && !isNaN(f.score)) ? Number(f.score) : 0), 0);
     const shown = s.status === 'graded' ? (s.total_score ?? total) : (total || '—');
     return `
-    <div class="paper-card grade-card">
+    <div class="paper-card grade-card" id="grade-card-${s.id}">
         <div class="paper-card-head">
             <span class="paper-card-title">🧑‍🎓 ${esc(s.name)}</span>
             <span class="tag">${esc(s.class_name || '')}</span>
