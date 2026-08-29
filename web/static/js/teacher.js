@@ -268,7 +268,7 @@ function renderGradeOverview() {
 async function loadExamManage() {
     const d = await authedJson('/api/papers');
     _papersCache = d.papers || [];
-    const exams = _papersCache.filter(p => !p.is_practice && (p.distributed_count || 0) > 0);
+    const exams = _papersCache.filter(p => (p.distributed_count || 0) > 0);
     $('examManageList').innerHTML = exams.length
         ? exams.map(examRow).join('')
         : '<p class="empty-row">暂无已分发的正式考试</p>';
@@ -276,23 +276,66 @@ async function loadExamManage() {
 
 function examRow(p) {
     const dist = p.distributed_count || 0, sub = p.submitted_count || 0, graded = p.graded_count || 0;
+    const unsub = dist - sub, ungraded = sub - graded;
+    const subRatio = dist ? sub / dist : 0;
+    const gradeRatio = sub ? graded / sub : 0;
     return `
-    <div class="paper-card" style="cursor:pointer" onclick="openGrade(${p.id})">
+    <div class="paper-card exam-manage-card exam-head" onclick="toggleExamDetail(${p.id})">
         <div class="paper-card-head">
             <span class="paper-card-title">📄 ${esc(p.title)}</span>
+            <span class="tag">${esc(p.subject || '未指定学科')}</span>
+            ${p.is_practice ? '<span class="tag">🏷️ 练习</span>' : ''}
             <span class="tag">${p.question_count} 题 / 总分 ${p.total_score ?? 0}</span>
-            <span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>
+            ${p.is_practice ? '' : `<span class="tag ${p.published ? 'pub-yes' : 'pub-no'}">${p.published ? '✅ 已发布' : '⏳ 未发布'}</span>`}
+            <span class="hint" style="margin-left:auto" id="examArrow_${p.id}">▾ 点击查看详情</span>
         </div>
-        <div class="paper-card-stats">
-            <span>分发 ${dist} 人</span>
-            <span>已交 ${sub} / 未交 ${dist - sub}</span>
-            <span>已批改 ${graded} / 未批改 ${sub - graded}</span>
+        <div class="exam-stats-grid">
+            <div class="exam-stat"><div class="stat-num-lg ok">${sub}</div><div class="stat-label">已提交</div></div>
+            <div class="exam-stat"><div class="stat-num-lg warn">${unsub}</div><div class="stat-label">未提交</div></div>
+            <div class="exam-stat"><div class="stat-num-lg ok">${graded}</div><div class="stat-label">已批改</div></div>
+            <div class="exam-stat"><div class="stat-num-lg warn">${ungraded}</div><div class="stat-label">未批改</div></div>
+            <div class="exam-donuts">
+                <div class="donut-item">${svgDonut(subRatio, { label: Math.round(subRatio * 100) + '%' })}<div class="stat-label">提交率</div></div>
+                <div class="donut-item">${svgDonut(gradeRatio, { fg: '#10b981', label: Math.round(gradeRatio * 100) + '%' })}<div class="stat-label">批改率</div></div>
+            </div>
+        </div>
+        <div class="exam-detail hidden" id="examDetail_${p.id}">
+            <div class="exam-info-grid">
+                <span>科目：${esc(p.subject || '—')}</span>
+                <span>题数：${p.question_count}</span>
+                <span>总分：${p.total_score ?? 0}</span>
+                <span>时长：${p.duration || 120} 分钟</span>
+                <span>创建：${esc((p.created_at || '').slice(0, 16))}</span>
+                <span>发布：${p.published_at ? esc((p.published_at || '').slice(0, 16)) : '未发布'}</span>
+                ${p.remark ? `<span>备注：${esc(p.remark)}</span>` : ''}
+            </div>
+            <div class="exam-students">
+                <div class="exam-students-head">学生名单（${dist} 人）— 点击学生进入该生批改</div>
+                ${(p.distributions || []).map(d => `
+                    <div class="student-row" onclick="event.stopPropagation(); openGrade(${p.id}, ${d.sub_id})" title="进入该生批改">
+                        <span>🧑‍🎓 ${esc(d.name)}</span>
+                        <span class="tag">${esc(d.class_name || '')}</span>
+                        <span class="hint">${esc(d.student_no || '')}</span>
+                        <span class="tag status-${esc(d.status || 'none')}">${d.status === 'graded' ? '已批改' : (d.status === 'submitted' ? '已提交' : '未作答')}</span>
+                        <span class="score-big" style="margin-left:auto">${d.status === 'graded' ? (d.total_score ?? '—') : '—'}</span>
+                    </div>`).join('') || '<span class="hint">暂无学生</span>'}
+            </div>
         </div>
         <div class="paper-card-actions">
             <button class="btn-small" onclick="event.stopPropagation(); openGrade(${p.id})">✍️ 去批改</button>
-            ${p.published ? '' : `<button class="btn-small btn-primary-inline" onclick="event.stopPropagation(); publishPaper(${p.id})">📣 发布成绩</button>`}
+            ${p.is_practice ? '' : (p.published ? '' : `<button class="btn-small btn-primary-inline" onclick="event.stopPropagation(); publishPaper(${p.id})">📣 发布成绩</button>`)}
         </div>
     </div>`;
+}
+
+// 展开/收起考试详情（整卡点击切换；内层按钮/学生行已 stopPropagation，不会误触）
+function toggleExamDetail(pid) {
+    const el = $('examDetail_' + pid);
+    const arrow = $('examArrow_' + pid);
+    if (!el) return;
+    const opening = el.classList.contains('hidden');
+    el.classList.toggle('hidden');
+    if (arrow) arrow.textContent = opening ? '▴ 收起' : '▾ 点击查看详情';
 }
 
 async function publishPaper(pid) {
