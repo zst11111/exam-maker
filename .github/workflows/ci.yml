@@ -2,10 +2,10 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  hello:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "仓库已经拉下来了"
-      - run: ls -la
-      - run: python -c "print('hello CI')"
+      - run: python -m compileall -q web
+      - run: node --check web/static/js/charts.js
+      - run: node --check web/static/js/teacher.js
